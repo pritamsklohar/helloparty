@@ -76,7 +76,7 @@ const RoomPage = () => {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         localStreamRef.current = stream;
         
-        socketRef.current = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+        socketRef.current = io(import.meta.env.VITE_API_URL, {
           withCredentials: true
         });
 
