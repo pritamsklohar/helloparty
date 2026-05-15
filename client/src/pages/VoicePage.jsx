@@ -15,11 +15,12 @@ const VoicePage = () => {
   const [rooms, setRooms] = useState([]);
   const [fetchingRooms, setFetchingRooms] = useState(true);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const fetchRooms = async () => {
     setFetchingRooms(true);
     try {
       const res = await api.get('/rooms');
-      // Filter for voice category if needed, or show all for now
       setRooms(res.data);
     } catch (error) {
       console.error('Failed to fetch rooms:', error);
@@ -31,6 +32,11 @@ const VoicePage = () => {
   useEffect(() => {
     fetchRooms();
   }, []);
+
+  const filteredRooms = rooms.filter(room => 
+    room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    room.host?.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
@@ -45,11 +51,9 @@ const VoicePage = () => {
         password: hasPassword ? password : ''
       });
       setIsModalOpen(false);
-      // Navigate to the newly created room
       navigate(`/room/${res.data._id}`);
     } catch (error) {
       console.error('Failed to create room:', error);
-      // In a real app, we'd use toast.error here
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +67,9 @@ const VoicePage = () => {
           <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg drop-shadow-md z-10" />
           <input 
             type="text" 
-            placeholder="Search room by id..." 
+            placeholder="Search by room name or host..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full py-2.5 pl-12 pr-4 focus:outline-none focus:bg-white/20 focus:border-white/40 transition-all text-sm placeholder:text-white/70 shadow-inner"
           />
         </div>
@@ -82,20 +88,14 @@ const VoicePage = () => {
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-sm">Finding active rooms...</p>
           </div>
-        ) : rooms.length > 0 || true ? ( // Forced true to show mock data for exam
+        ) : filteredRooms.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl mx-auto">
-            {/* Real Rooms + Mock Rooms for display */}
-            {[...rooms, 
-              { _id: 'mock1', name: 'Late Night Chat 🌙', members: [1,2,3,4,5], host: { username: 'Starlight' }, isMock: true },
-              { _id: 'mock2', name: 'Music Jam 🎸', members: [1,2,3], host: { username: 'Melody' }, isMock: true },
-              { _id: 'mock3', name: 'Gaming Zone 🎮', members: [1,2,3,4,5,6,7,8], host: { username: 'ProGamer' }, isMock: true },
-              { _id: 'mock4', name: 'English Practice 🌎', members: [1,2], host: { username: 'Teacher_John' }, isMock: true }
-            ].map((room) => (
+            {filteredRooms.map((room) => (
               <motion.div
                 key={room._id}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => !room.isMock && navigate(`/room/${room._id}`)}
+                onClick={() => navigate(`/room/${room._id}`)}
                 className="bg-surfaceAlt/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 cursor-pointer hover:bg-surfaceAlt/60 transition-all group relative overflow-hidden"
               >
                 {/* Background Decor */}
@@ -109,7 +109,7 @@ const VoicePage = () => {
                     <div className="flex items-center gap-2 mt-1">
                       <div className="w-5 h-5 rounded-full overflow-hidden border border-white/10">
                         <img 
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${room.host?.username || 'Host'}`} 
+                          src={room.host?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${room.host?.username || 'Host'}`} 
                           alt="Host" 
                           className="w-full h-full object-cover bg-surface"
                         />
@@ -130,9 +130,6 @@ const VoicePage = () => {
                   </span>
                   {room.isPrivate && (
                     <FiLock className="text-white/30 text-xs" />
-                  )}
-                  {room.isMock && (
-                    <span className="ml-auto text-[10px] text-white/20 font-medium">Demo Room</span>
                   )}
                 </div>
               </motion.div>

@@ -8,22 +8,7 @@ import { useVoiceRoom } from '../context/VoiceRoomContext';
 import io from 'socket.io-client';
 import Peer from 'simple-peer';
 import { useRef } from 'react';
-
-// Mock data
-const MOCK_USERS = [
-  { id: '1', username: 'Alex', isHost: true, isSpeaking: true, isMuted: false },
-  { id: '2', username: 'SarahX', isHost: false, isSpeaking: false, isMuted: true },
-  { id: '3', username: 'NightWolf', isHost: false, isSpeaking: false, isMuted: false },
-  { id: '4', username: 'Picasso', isHost: false, isSpeaking: false, isMuted: false },
-  { id: '5', username: 'Emma', isHost: false, isSpeaking: true, isMuted: false },
-];
-
-const MOCK_MESSAGES = [
-  { id: '1', type: 'SYSTEM', content: 'Alex created the room' },
-  { id: '2', type: 'TEXT', sender: { username: 'SarahX' }, content: 'Hey everyone! Ready for a game?' },
-  { id: '3', type: 'TEXT', sender: { username: 'NightWolf' }, content: 'Yeah let\'s play Spy!' },
-  { id: '4', type: 'SYSTEM', content: 'Emma joined the room' },
-];
+import useAuthStore from '../store/authStore';
 
 const RoomPage = () => {
   const { id } = useParams();
@@ -31,21 +16,39 @@ const RoomPage = () => {
   const { joinRoom, closeRoom } = useVoiceRoom();
   const [roomData, setRoomData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); 
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+  const [messages, setMessages] = useState([]);
   const [gameActive, setGameActive] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [speakingPeers, setSpeakingPeers] = useState({}); // { peerId: boolean }
+  const [speakingPeers, setSpeakingPeers] = useState({}); 
   
-  const [speakingToggle, setSpeakingToggle] = useState(false);
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
+  const [activeSpeakerId, setActiveSpeakerId] = useState(null); 
+  const [localSpeaking, setLocalSpeaking] = useState(false);
+  const [mutedPeers, setMutedPeers] = useState(new Set()); 
   
-  // WebRTC Refs
+  // WebRTC & Seats Refs
   const socketRef = useRef();
   const localStreamRef = useRef();
-  const peersRef = useRef([]); // { peerId, peer, stream }
-  const [remoteStreams, setRemoteStreams] = useState([]); // Array of { socketId, stream }
+  const peersRef = useRef(new Map()); // Map<userId, { peer, stream }>
+  const [remotePeers, setRemotePeers] = useState([]); // Array of userIds to trigger re-render
+  const isInitializingRef = useRef(false);
+  
+  // Mapping socketId -> userObject { userId, username, avatarUrl }
+  const socketToUserRef = useRef(new Map());
+  const { user: currentUser } = useAuthStore();
+  
+  const ownerId = roomData?.host?.id || roomData?.host?._id;
+  const isOwner = (uid) => uid === ownerId;
+  const [seats, setSeats] = useState(Array(8).fill(null));
+  const [seatModal, setSeatModal] = useState(null); // { type, seatIndex, userId }
+  const myUserId = useRef(null);
+
+  // Helper to update UI list
+  const updateRemotePeers = () => {
+    setRemotePeers(Array.from(peersRef.current.keys()));
+  };
 
   useEffect(() => {
     // 1. Get Room Data
@@ -65,106 +68,180 @@ const RoomPage = () => {
 
     // 2. Initialize WebRTC & Socket
     const initWebRTC = async () => {
+      if (isInitializingRef.current || socketRef.current) return;
+      isInitializingRef.current = true;
+
       try {
-        // Get local audio
+        console.log('Initializing owner/user mic. Default micEnabled: true');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         localStreamRef.current = stream;
         
-        // Connect socket
         socketRef.current = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
           withCredentials: true
         });
 
-        socketRef.current.emit('peer:join_room', { roomId: id });
-
-        // Handle existing users
-        socketRef.current.on('peer:existing_users', ({ users }) => {
-          users.forEach(userId => {
-            const peer = createPeer(userId, socketRef.current.id, stream);
-            peersRef.current.push({ peerId: userId, peer });
+        socketRef.current.on('connect', () => {
+          myUserId.current = socketRef.current.id;
+          socketRef.current.emit('peer:join_room', { 
+            roomId: id, 
+            user: {
+              userId: currentUser?._id || currentUser?.id,
+              username: currentUser?.username,
+              avatarUrl: currentUser?.avatarUrl
+            }
           });
-          setRemoteStreams([...peersRef.current]);
         });
 
-        // Handle new user
-        socketRef.current.on('peer:new_user_joined', ({ userId }) => {
-          const peer = addPeer(userId, socketRef.current.id, stream);
-          peersRef.current.push({ peerId: userId, peer });
-          setRemoteStreams([...peersRef.current]);
+        socketRef.current.on('peer:existing_users', ({ users, seats: initialSeats }) => {
+          if (initialSeats) setSeats(initialSeats);
+          users.forEach(({ socketId, user: userData }) => {
+            socketToUserRef.current.set(socketId, userData);
+            if (!peersRef.current.has(socketId)) {
+              const peer = createPeer(socketId, stream);
+              peersRef.current.set(socketId, { peer, stream: null, user: userData });
+            }
+          });
+          updateRemotePeers();
         });
 
-        // Handle offer
+        socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats }) => {
+          setSeats(updatedSeats);
+        });
+
+        socketRef.current.on('peer:new_user_joined', ({ socketId, user: userData }) => {
+          socketToUserRef.current.set(socketId, userData);
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'SYSTEM',
+            content: `${userData.username} joined the room`
+          }]);
+          if (!peersRef.current.has(socketId)) {
+            const peer = addPeer(socketId, stream);
+            peersRef.current.set(socketId, { peer, stream: null, user: userData });
+            updateRemotePeers();
+          }
+        });
+
+        socketRef.current.on('peer:receive_message', (msg) => {
+          setMessages(prev => [...prev, msg]);
+        });
+
         socketRef.current.on('peer:offer', ({ sdp, fromUserId }) => {
-          const peer = peersRef.current.find(p => p.peerId === fromUserId)?.peer;
-          if (peer) peer.signal(sdp);
+          const peerData = peersRef.current.get(fromUserId);
+          if (peerData && peerData.peer) {
+            try {
+              peerData.peer.signal(sdp);
+            } catch (e) {
+              console.warn('Signal error (offer):', e);
+            }
+          }
         });
 
-        // Handle answer
         socketRef.current.on('peer:answer', ({ sdp, fromUserId }) => {
-          const peer = peersRef.current.find(p => p.peerId === fromUserId)?.peer;
-          if (peer) peer.signal(sdp);
+          const peerData = peersRef.current.get(fromUserId);
+          if (peerData && peerData.peer) {
+            try {
+              peerData.peer.signal(sdp);
+            } catch (e) {
+              console.warn('Signal error (answer):', e);
+            }
+          }
         });
 
-        // Handle ICE
         socketRef.current.on('peer:ice_candidate', ({ candidate, fromUserId }) => {
-          const peer = peersRef.current.find(p => p.peerId === fromUserId)?.peer;
-          if (peer) peer.signal(candidate);
+          const peerData = peersRef.current.get(fromUserId);
+          if (peerData && peerData.peer) {
+            try {
+              peerData.peer.signal(candidate);
+            } catch (e) {
+              console.warn('Signal error (ice):', e);
+            }
+          }
         });
 
-        // Handle user left
+        socketRef.current.on('peer:mute_updated', ({ socketId, isMuted }) => {
+          setMutedPeers(prev => {
+            const next = new Set(prev);
+            if (isMuted) next.add(socketId);
+            else next.delete(socketId);
+            return next;
+          });
+        });
+
         socketRef.current.on('peer:user_left', ({ userId }) => {
-          const peerObj = peersRef.current.find(p => p.peerId === userId);
-          if (peerObj) peerObj.peer.destroy();
-          peersRef.current = peersRef.current.filter(p => p.peerId !== userId);
-          setRemoteStreams([...peersRef.current]);
+          const userData = socketToUserRef.current.get(userId);
+          if (userData) {
+            setMessages(prev => [...prev, {
+              id: Date.now().toString(),
+              type: 'SYSTEM',
+              content: `${userData.username} left the room`
+            }]);
+          }
+          const peerData = peersRef.current.get(userId);
+          if (peerData) {
+            peerData.peer.destroy();
+            peersRef.current.delete(userId);
+            socketToUserRef.current.delete(userId);
+            setMutedPeers(prev => {
+              const next = new Set(prev);
+              next.delete(userId);
+              return next;
+            });
+            updateRemotePeers();
+          }
         });
-
       } catch (err) {
         console.error('WebRTC Init Error:', err);
+      } finally {
+        isInitializingRef.current = false;
       }
     };
 
     initWebRTC();
 
-    const interval = setInterval(() => setSpeakingToggle(prev => !prev), 1500);
     return () => {
-      clearInterval(interval);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
       if (socketRef.current) {
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
-      peersRef.current.forEach(p => p.peer.destroy());
+      peersRef.current.forEach(data => data.peer.destroy());
+      peersRef.current.clear();
     };
   }, [id, navigate]);
 
   // Peer Helper Functions
-  const createPeer = (userToSignal, callerId, stream) => {
+  const createPeer = (userToSignal, stream) => {
     const peer = new Peer({ initiator: true, trickle: false, stream });
     peer.on('signal', signal => {
-      socketRef.current.emit('peer:offer', { targetUserId: userToSignal, sdp: signal });
+      if (socketRef.current) {
+        socketRef.current.emit('peer:offer', { targetUserId: userToSignal, sdp: signal });
+      }
     });
     peer.on('stream', remoteStream => {
-      const peerObj = peersRef.current.find(p => p.peerId === userToSignal);
-      if (peerObj) {
-        peerObj.stream = remoteStream;
-        setRemoteStreams([...peersRef.current]);
+      const peerData = peersRef.current.get(userToSignal);
+      if (peerData) {
+        peerData.stream = remoteStream;
+        updateRemotePeers();
       }
     });
     return peer;
   };
 
-  const addPeer = (incomingSignal, callerId, stream) => {
+  const addPeer = (userId, stream) => {
     const peer = new Peer({ initiator: false, trickle: false, stream });
     peer.on('signal', signal => {
-      socketRef.current.emit('peer:answer', { targetUserId: incomingSignal, sdp: signal });
+      if (socketRef.current) {
+        socketRef.current.emit('peer:answer', { targetUserId: userId, sdp: signal });
+      }
     });
     peer.on('stream', remoteStream => {
-      const peerObj = peersRef.current.find(p => p.peerId === incomingSignal);
-      if (peerObj) {
-        peerObj.stream = remoteStream;
-        setRemoteStreams([...peersRef.current]);
+      const peerData = peersRef.current.get(userId);
+      if (peerData) {
+        peerData.stream = remoteStream;
+        updateRemotePeers();
       }
     });
     return peer;
@@ -174,11 +251,44 @@ const RoomPage = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
+        const newMuteState = audioTrack.enabled; 
         audioTrack.enabled = !audioTrack.enabled;
         setIsMuted(!audioTrack.enabled);
+        
+        if (!audioTrack.enabled && activeSpeakerId === myUserId.current) {
+          setActiveSpeakerId(null);
+        }
+
         socketRef.current.emit('peer:mute_state', { roomId: id, isMuted: !audioTrack.enabled });
       }
     }
+  };
+
+  const handleSeatClick = (index) => {
+    const occupantId = seats[index];
+    const amISitting = seats.includes(myUserId.current);
+    
+    if (occupantId === myUserId.current) {
+      setSeatModal({ type: 'CONFIRM_STAND', seatIndex: index });
+    } else if (occupantId) {
+      setSeatModal({ type: 'PROFILE', seatIndex: index, userId: occupantId });
+    } else {
+      if (amISitting) {
+        setSeatModal({ type: 'CONFIRM_CHANGE', seatIndex: index });
+      } else {
+        setSeatModal({ type: 'CONFIRM_SIT', seatIndex: index });
+      }
+    }
+  };
+
+  const sitDown = (index) => {
+    socketRef.current.emit('peer:sit_down', { roomId: id, seatIndex: index });
+    setSeatModal(null);
+  };
+
+  const standUp = () => {
+    socketRef.current.emit('peer:stand_up', { roomId: id });
+    setSeatModal(null);
   };
 
   const toggleSpeaker = () => {
@@ -197,17 +307,37 @@ const RoomPage = () => {
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isMenuOpen]);
 
+  const isHostMe = isOwner(currentUser?.id || currentUser?._id);
+  
+  const hostSocketId = !isHostMe 
+    ? Array.from(peersRef.current.entries()).find(([_, data]) => 
+        isOwner(data.user?.userId)
+      )?.[0]
+    : myUserId.current;
+
+  const handleSpeakingUpdate = (socketId, isSpeaking) => {
+    if (!socketId) return; 
+    if (isSpeaking) {
+      setActiveSpeakerId(socketId);
+    } else if (activeSpeakerId === socketId) {
+      setActiveSpeakerId(null);
+    }
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!message.trim()) return;
     
-    setMessages([...messages, {
+    const newMsg = {
       id: Date.now().toString(),
       type: 'TEXT',
       sender: { username: 'You' },
       content: message,
       isOwn: true
-    }]);
+    };
+    
+    setMessages(prev => [...prev, newMsg]);
+    socketRef.current.emit('peer:send_message', { roomId: id, message: message });
     setMessage('');
   };
 
@@ -315,48 +445,204 @@ const RoomPage = () => {
         
         {/* Host Area (Top Center) */}
         <div className="flex flex-col items-center justify-center mt-2 mb-8">
-          <div className="w-20 h-20 rounded-full border-2 border-[#8e44ad] p-0.5 relative shadow-[0_0_15px_rgba(142,68,173,0.5)]">
+          <div className={`w-20 h-20 rounded-full border-2 p-0.5 relative transition-all duration-300
+            ${isOwner(roomData?.host?.id || roomData?.host?._id) ? 'border-[#8e44ad]' : 'border-[#2ecc71]'}
+            ${activeSpeakerId === hostSocketId ? 'animate-pulse-glow scale-110' : ''}
+          `}>
+            {/* Rippling Rings when host is talking */}
+            {activeSpeakerId === hostSocketId && (
+              <>
+                <div className={`animate-ripple ${isOwner(roomData?.host?.id || roomData?.host?._id) ? 'ripple-owner' : 'ripple-user'}`} style={{ animationDelay: '0s' }}></div>
+                <div className={`animate-ripple ${isOwner(roomData?.host?.id || roomData?.host?._id) ? 'ripple-owner' : 'ripple-user'}`} style={{ animationDelay: '0.4s' }}></div>
+              </>
+            )}
             <img 
               src={roomData?.host?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${roomData?.host?.username || 'Host'}`} 
               alt="Host" 
-              className="w-full h-full rounded-full object-cover bg-surfaceAlt" 
+              className="w-full h-full rounded-full object-cover bg-surfaceAlt relative z-10" 
             />
+            
+            {/* If I am the host, use local VAD */}
+            {isHostMe ? (
+              <AudioStream 
+                stream={localStreamRef.current} 
+                micEnabled={!isMuted}
+                muted={true} 
+                onSpeaking={(speaking) => handleSpeakingUpdate(myUserId.current, speaking)}
+              />
+            ) : (
+              /* If I am a guest, find host peer stream */
+              hostSocketId && peersRef.current.get(hostSocketId)?.stream && (
+                <AudioStream 
+                  stream={peersRef.current.get(hostSocketId).stream} 
+                  micEnabled={!mutedPeers.has(hostSocketId)}
+                  muted={isSpeakerOff} 
+                  onSpeaking={(speaking) => handleSpeakingUpdate(hostSocketId, speaking)}
+                />
+              )
+            )}
+            
+            <div className="absolute -bottom-1 -right-1 bg-[#8e44ad] text-[10px] px-1.5 rounded-full text-white font-bold border border-white/20">OWNER</div>
           </div>
-          <div className="text-xs font-bold mt-2 text-white/90">
+          <div className={`text-xs font-bold mt-2 transition-colors ${activeSpeakerId === hostSocketId ? 'text-primary' : 'text-white/90'}`}>
             {roomData?.host?.username || 'Host Name'}
           </div>
         </div>
 
-        {/* Remote Peers Grid */}
-        <div className="grid grid-cols-4 gap-4 px-4">
-          {remoteStreams.slice(0, 8).map((peer, i) => (
-            <div key={peer.peerId} className="flex flex-col items-center">
-              <div className={`w-14 h-14 rounded-full border-2 transition-all duration-300 ${speakingPeers[peer.peerId] ? 'border-primary animate-pulse-glow scale-110' : 'border-white/20'} flex items-center justify-center bg-surfaceAlt overflow-hidden relative shadow-xl`}>
-                <img 
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.peerId}`} 
-                  alt="User"
-                  className="w-full h-full object-cover"
-                />
-                <AudioStream 
-                  stream={peer.stream} 
-                  muted={isSpeakerOff} 
-                  onSpeaking={(isSpeaking) => {
-                    setSpeakingPeers(prev => ({ ...prev, [peer.peerId]: isSpeaking }));
-                  }}
-                />
+        {/* Seats Grid */}
+        <div className="grid grid-cols-4 gap-y-10 gap-x-4 px-6 relative z-10">
+          {seats.map((userId, i) => {
+            const isMe = userId === myUserId.current;
+            const peerData = userId ? peersRef.current.get(userId) : null;
+            const isMutedRemote = mutedPeers.has(userId);
+            const isActuallySpeaking = userId && activeSpeakerId === userId;
+            
+            // Get user info from map
+            const userData = socketToUserRef.current.get(userId);
+            const userUid = isMe ? (currentUser?.id || currentUser?._id) : userData?.userId;
+            const userIsOwner = isOwner(userUid);
+            
+            const avatarUrl = isMe 
+              ? (currentUser?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.username}`) 
+              : (userData?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`);
+            
+            const userName = isMe 
+              ? (currentUser?.username || 'You') 
+              : (userData?.username || `Guest ${i+1}`);
+
+            return (
+              <div key={i} className="flex flex-col items-center">
+                <div 
+                  onClick={() => handleSeatClick(i)}
+                  className={`w-14 h-14 rounded-full border-2 transition-all duration-300 cursor-pointer flex items-center justify-center relative shadow-xl
+                    ${userId ? 'bg-surfaceAlt' : 'bg-black/10 border-white/10 hover:bg-white/5'}
+                    ${userIsOwner ? 'border-[#8e44ad]' : 'border-[#2ecc71]'}
+                    ${isActuallySpeaking ? 'animate-pulse-glow scale-110' : ''}
+                  `}
+                >
+                  {/* Rippling Rings when talking */}
+                  {isActuallySpeaking && (
+                    <>
+                      <div className={`animate-ripple ${userIsOwner ? 'ripple-owner' : 'ripple-user'}`} style={{ animationDelay: '0s' }}></div>
+                      <div className={`animate-ripple ${userIsOwner ? 'ripple-owner' : 'ripple-user'}`} style={{ animationDelay: '0.4s' }}></div>
+                    </>
+                  )}
+
+                  {userId ? (
+                    <>
+                      <img 
+                        src={avatarUrl} 
+                        alt="User"
+                        className="w-full h-full object-cover rounded-full relative z-10"
+                      />
+                      {isMe ? (
+                        <AudioStream 
+                          stream={localStreamRef.current} 
+                          micEnabled={!isMuted}
+                          muted={true} 
+                          onSpeaking={(speaking) => handleSpeakingUpdate(myUserId.current, speaking)}
+                        />
+                      ) : (
+                        peerData?.stream && (
+                          <AudioStream 
+                            stream={peerData.stream} 
+                            micEnabled={!isMutedRemote}
+                            muted={isSpeakerOff} 
+                            onSpeaking={(speaking) => handleSpeakingUpdate(userId, speaking)}
+                          />
+                        )
+                      )}
+                      {isMe && (
+                        <div className="absolute -top-1 -right-1 bg-primary text-[8px] px-1 rounded-full text-white font-bold">YOU</div>
+                      )}
+                      {userIsOwner && !isMe && (
+                        <div className="absolute -top-1 -right-1 bg-[#8e44ad] text-[6px] px-1 rounded-full text-white font-bold">OWNER</div>
+                      )}
+                    </>
+                  ) : (
+                    <FiPlus className="text-white/30 text-xl" />
+                  )}
+                </div>
+                <span className={`text-[10px] mt-1.5 transition-colors max-w-[60px] truncate ${isActuallySpeaking ? 'text-primary font-bold' : 'text-white/50'}`}>
+                  {userName}
+                </span>
               </div>
-              <span className={`text-[10px] mt-1 transition-colors ${speakingPeers[peer.peerId] ? 'text-primary font-bold' : 'text-white/50'}`}>Guest {i+1}</span>
-            </div>
-          ))}
-          
-          {[...Array(Math.max(0, 8 - remoteStreams.length))].map((_, i) => (
-            <div key={i} className="flex flex-col items-center">
-              <div className="w-14 h-14 rounded-full border border-white/20 flex items-center justify-center bg-black/10 text-white/40 hover:bg-white/5 transition-colors cursor-pointer">
-                <FiPlus className="text-xl" />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Seat Interaction Modal */}
+        <AnimatePresence>
+          {seatModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                onClick={() => setSeatModal(null)}
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-surfaceAlt/95 backdrop-blur-xl border border-white/10 w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl relative z-10"
+              >
+                {seatModal.type === 'PROFILE' ? (
+                  <div className="p-6 flex flex-col items-center text-center">
+                    <div className="w-20 h-20 rounded-full border-2 border-primary p-0.5 mb-4 shadow-lg shadow-primary/20">
+                      <img 
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seatModal.userId}`} 
+                        alt="Profile" 
+                        className="w-full h-full rounded-full object-cover bg-bg" 
+                      />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">Guest {seatModal.seatIndex + 1}</h3>
+                    <p className="text-xs text-white/50 mb-6 font-mono">UID: {seatModal.userId.substring(0, 8)}</p>
+                    <div className="grid grid-cols-2 gap-3 w-full">
+                      <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors">
+                        <FiSend className="text-primary" /> Message
+                      </button>
+                      <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors">
+                        <FiUserPlus className="text-primary" /> Follow
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 flex flex-col items-center text-center">
+                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                      <FiPlus className="text-2xl text-primary" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2">
+                      {seatModal.type === 'CONFIRM_SIT' && 'Take this seat?'}
+                      {seatModal.type === 'CONFIRM_STAND' && 'Stand up from seat?'}
+                      {seatModal.type === 'CONFIRM_CHANGE' && 'Move to this seat?'}
+                    </h3>
+                    <p className="text-xs text-white/50 mb-6">
+                      {seatModal.type === 'CONFIRM_SIT' && 'You will be able to speak once you sit down.'}
+                      {seatModal.type === 'CONFIRM_STAND' && 'You will stop speaking and become a listener.'}
+                      {seatModal.type === 'CONFIRM_CHANGE' && 'You will move from your current seat to this one.'}
+                    </p>
+                    <div className="flex gap-3 w-full">
+                      <button 
+                        onClick={() => setSeatModal(null)}
+                        className="flex-1 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={() => seatModal.type === 'CONFIRM_STAND' ? standUp() : sitDown(seatModal.seatIndex)}
+                        className="flex-1 bg-primary hover:bg-primary-dark py-3 rounded-2xl text-sm font-bold text-white transition-colors"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Chat Area (Overlay at Bottom) */}
         <div className="w-full h-48 px-3 flex flex-col justify-end pb-2 overflow-hidden pointer-events-none mt-auto">
@@ -417,57 +703,109 @@ const RoomPage = () => {
 const injectStyles = () => {
   const style = document.createElement('style');
   style.innerHTML = `
-    @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 5px rgba(142, 68, 173, 0.4), 0 0 10px rgba(142, 68, 173, 0.2); border-color: rgba(142, 68, 173, 0.5); }
-      50% { box-shadow: 0 0 20px rgba(142, 68, 173, 0.8), 0 0 30px rgba(142, 68, 173, 0.4); border-color: rgba(142, 68, 173, 1); }
+    @keyframes ripple {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.6); opacity: 0; }
     }
-    .animate-pulse-glow { animation: pulse-glow 1s infinite; }
+    .animate-ripple {
+      position: absolute;
+      top: -6px; left: -6px; right: -6px; bottom: -6px;
+      border-radius: 50%;
+      border-width: 4px; /* Thicker solid ring */
+      border-style: solid;
+      animation: ripple 1.2s infinite;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .ripple-owner { border-color: #8e44ad; }
+    .ripple-user { border-color: #2ecc71; }
+
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1.05); }
+      50% { transform: scale(1.15); }
+    }
+    .animate-pulse-glow { animation: pulse-glow 0.8s infinite; }
   `;
   document.head.appendChild(style);
 };
 injectStyles();
 
 // Helper component to play remote audio streams with Voice Activity Detection
-const AudioStream = ({ stream, muted, onSpeaking }) => {
+const AudioStream = ({ stream, muted, onSpeaking, micEnabled }) => {
   const audioRef = useRef();
+  const timeoutRef = useRef(null);
+  const speakingRef = useRef(false);
 
   useEffect(() => {
     if (audioRef.current && stream) {
       audioRef.current.srcObject = stream;
-
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      let speaking = false;
-      const checkSpeaking = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let values = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          values += dataArray[i];
-        }
-        const average = values / bufferLength;
-        const currentlySpeaking = average > 15; // Sensitivity threshold
-
-        if (currentlySpeaking !== speaking) {
-          speaking = currentlySpeaking;
-          onSpeaking(speaking);
-        }
-        requestAnimationFrame(checkSpeaking);
-      };
-      
-      checkSpeaking();
-
-      return () => {
-        audioContext.close();
-      };
     }
-  }, [stream, onSpeaking]);
+  }, [stream]);
+
+  useEffect(() => {
+    if (!stream || !micEnabled) {
+      if (speakingRef.current) {
+        speakingRef.current = false;
+        onSpeaking(false);
+      }
+      return;
+    }
+
+    let audioContext, analyser, source, dataArray, animationId;
+
+    const setupAudio = () => {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+
+        const checkSpeaking = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let values = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            values += dataArray[i];
+          }
+          const average = values / bufferLength;
+          const currentlySpeaking = average > 20; // Increased threshold to 20 for solid detection
+
+          if (currentlySpeaking) {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+            if (!speakingRef.current) {
+              speakingRef.current = true;
+              onSpeaking(true);
+            }
+          } else if (speakingRef.current) {
+            if (!timeoutRef.current) {
+              timeoutRef.current = setTimeout(() => {
+                speakingRef.current = false;
+                onSpeaking(false);
+                timeoutRef.current = null;
+              }, 300); // 300ms smoothing delay
+            }
+          }
+          animationId = requestAnimationFrame(checkSpeaking);
+        };
+        checkSpeaking();
+      } catch (err) {
+        console.error('Audio Setup Error:', err);
+      }
+    };
+
+    setupAudio();
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (audioContext) audioContext.close();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [stream, micEnabled]);
 
   return <audio ref={audioRef} autoPlay muted={muted} className="hidden" />;
 };

@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiEdit2, FiSettings, FiCheckCircle, FiCopy, FiUser, FiImage, FiBarChart2, FiEye, FiUserPlus, FiGlobe, FiHelpCircle, FiChevronRight } from 'react-icons/fi';
-import { FaCoins, FaGamepad, FaTrophy, FaUsers, FaArrowRight } from 'react-icons/fa';
+import { FaCoins, FaGamepad, FaTrophy, FaUsers, FaArrowRight, FaMars, FaVenus, FaGenderless } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import Navbar from '../components/layout/Navbar';
 import api from '../services/api';
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [latestMemory, setLatestMemory] = useState(null);
 
   useEffect(() => {
     // We already have some user data from store, but let's fetch full profile
@@ -24,7 +27,20 @@ const ProfilePage = () => {
         setLoading(false);
       }
     };
+
+    const fetchLatestMemory = async () => {
+      try {
+        const res = await api.get('/memories/me');
+        if (res.data.length > 0) {
+          setLatestMemory(res.data[0]);
+        }
+      } catch (err) {
+        console.error('Fetch latest memory error:', err);
+      }
+    };
+
     fetchProfile();
+    fetchLatestMemory();
   }, []);
 
   const copyId = () => {
@@ -56,7 +72,10 @@ const ProfilePage = () => {
           
           {/* Top Right Icons */}
           <div className="absolute top-4 right-4 flex gap-2 z-20">
-            <button className="w-9 h-9 bg-black/30 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors">
+            <button 
+              onClick={() => navigate('/edit-profile')}
+              className="w-9 h-9 bg-black/30 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors"
+            >
               <FiEdit2 size={18} />
             </button>
             <button className="w-9 h-9 bg-black/30 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors">
@@ -77,7 +96,10 @@ const ProfilePage = () => {
                     className="w-full h-full object-cover" 
                   />
                 </div>
-                <button className="absolute bottom-2 right-2 w-8 h-8 md:w-10 md:h-10 bg-surfaceAlt border-2 border-bg rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-primary transition-colors">
+                <button 
+                  onClick={() => navigate('/edit-profile')}
+                  className="absolute bottom-2 right-2 w-8 h-8 md:w-10 md:h-10 bg-surfaceAlt border-2 border-bg rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-primary transition-colors shadow-lg"
+                >
                   <FiEdit2 size={14} />
                 </button>
               </div>
@@ -87,21 +109,55 @@ const ProfilePage = () => {
             <div className="flex-1 sm:pt-20 pb-8">
               <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
-                  <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                  <h1 
+                    onClick={() => navigate(`/user/${profileData.uid}`)}
+                    className="text-xl md:text-2xl font-bold flex items-center gap-2 cursor-pointer group"
+                  >
+                    {profileData.gender === 'male' && <FaMars className="text-[#0984e3] text-2xl" />}
+                    {profileData.gender === 'female' && <FaVenus className="text-[#e84393] text-2xl" />}
                     {profileData.username}
                     <span className="px-1.5 py-0.5 bg-primary/20 text-primary border border-primary/30 rounded text-[10px] tracking-wider uppercase">
                       LV {profileData.level || 1}
                     </span>
+                    <FiChevronRight className="text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all" />
                   </h1>
                   <div className="flex items-center gap-2 text-white/40 mt-1 font-mono text-xs">
                     UID: {profileData.uid || profileData._id}
                     <button onClick={copyId} className="hover:text-white transition-colors"><FiCopy /></button>
                   </div>
+
+                  {profileData.bio && (
+                    <p className="mt-4 text-white/60 text-sm max-w-md leading-relaxed italic border-l-2 border-primary/30 pl-3">
+                      {profileData.bio}
+                    </p>
+                  )}
                 </div>
-                
-                
-                <div className="flex gap-3 mt-2 md:mt-0">
-                  {/* Buttons moved to top right */}
+              </div>
+
+              {/* Memories Section */}
+              <div className="mt-8">
+                <div 
+                  onClick={() => navigate('/memories')}
+                  className="bg-surfaceAlt/30 rounded-[32px] p-5 flex items-center justify-between group cursor-pointer hover:bg-white/[0.05] border border-white/5 transition-all shadow-2xl"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-surfaceAlt rounded-[22px] overflow-hidden flex-shrink-0 flex items-center justify-center border border-white/10 shadow-inner">
+                      {latestMemory?.imageUrls?.length > 0 ? (
+                        <img src={latestMemory.imageUrls[0]} className="w-full h-full object-cover" alt="Latest" />
+                      ) : (
+                        <FiImage className="text-white/10 text-3xl" />
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-black text-white tracking-tight uppercase tracking-widest">My Memories</h3>
+                      <p className="text-[10px] text-white/30 font-black tracking-[0.15em] uppercase truncate max-w-[150px]">
+                        {latestMemory ? (latestMemory.content || 'Latest shared vibe') : 'No vibes yet'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-primary transition-all shadow-lg">
+                    <FiChevronRight className="text-white/20 group-hover:text-white transition-colors text-2xl translate-x-0.5" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -109,7 +165,6 @@ const ProfilePage = () => {
 
           <div className="grid grid-cols-1 gap-4 mt-8 pb-10">
             {[
-              { icon: <FiImage />, label: 'Moment', color: 'text-[#ff4757]' },
               { icon: <FiBarChart2 />, label: 'Stats', color: 'text-[#2e86de]' },
               { icon: <FiEye />, label: 'Viewers', color: 'text-[#8e44ad]' },
               { icon: <FiUserPlus />, label: 'Invite Friends', color: 'text-[#27ae60]' },
@@ -123,6 +178,9 @@ const ProfilePage = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
                 className="flex items-center justify-between p-4 bg-surfaceAlt/40 hover:bg-surfaceAlt/60 border border-white/5 rounded-2xl cursor-pointer transition-all group"
+                onClick={() => {
+                  if (item.label === 'Memories') navigate('/memories');
+                }}
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-10 h-10 rounded-xl bg-surfaceAlt flex items-center justify-center text-xl ${item.color}`}>

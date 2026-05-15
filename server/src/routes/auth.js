@@ -5,15 +5,32 @@ const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 
+const upload = require('../middleware/upload');
+
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
   const refreshToken = jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
   return { accessToken, refreshToken };
 };
 
-router.post('/register', async (req, res) => {
+const cloudinary = require('../config/cloudinary');
+
+router.post('/register', upload.single('avatar'), async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    let avatarUrl;
+
+    if (req.file) {
+      avatarUrl = req.file.path;
+    } else {
+      // If no file, generate Dicebear and upload to Cloudinary for persistence
+      const dicebearUrl = `https://api.dicebear.com/7.x/avataaars/png?seed=${username}`;
+      const uploadResponse = await cloudinary.uploader.upload(dicebearUrl, {
+        folder: 'helloparty_avatars',
+        transformation: [{ width: 200, height: 200, crop: 'limit' }]
+      });
+      avatarUrl = uploadResponse.secure_url;
+    }
     
     let user = await User.findOne({ $or: [{ email }, { username }] });
     if (user) return res.status(400).json({ message: 'User already exists' });
@@ -21,7 +38,7 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    user = new User({ username, email, passwordHash });
+    user = new User({ username, email, passwordHash, avatarUrl });
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshTokens.push(refreshToken);
     await user.save();
@@ -37,6 +54,7 @@ router.post('/register', async (req, res) => {
       user: { id: user._id, username: user.username, email: user.email, avatarUrl: user.avatarUrl, coins: user.coins }
     });
   } catch (error) {
+    console.error('Register error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

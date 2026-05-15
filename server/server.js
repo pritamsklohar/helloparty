@@ -29,6 +29,10 @@ connectDB();
 // Routes
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/rooms', require('./src/routes/rooms'));
+app.use('/api/users', require('./src/routes/users'));
+app.use('/api/upload', require('./src/routes/upload'));
+app.use('/api/memories', require('./src/routes/memories'));
+app.use('/api/groups', require('./src/routes/groups'));
 
 // Socket.io handlers
 const setupSocket = require('./src/socket');

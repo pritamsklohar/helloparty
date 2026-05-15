@@ -1,4 +1,5 @@
 const signalingHandler = require('./signalingHandler');
+const chatHandler = require('./chatHandler');
 
 const setupSocket = (io) => {
   io.on('connection', (socket) => {
@@ -6,6 +7,7 @@ const setupSocket = (io) => {
     
     // Pass socket to specific feature handlers
     signalingHandler(io, socket);
+    chatHandler(io, socket);
 
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);

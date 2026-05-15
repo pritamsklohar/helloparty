@@ -6,7 +6,20 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   passwordHash: { type: String, required: true },
   avatarUrl: { type: String, default: '' },
-  bio: { type: String, default: '' },
+  bio: { 
+    type: String, 
+    default: '',
+    validate: {
+      validator: function(v) {
+        if (!v) return true;
+        return v.trim().split(/\s+/).filter(word => word.length > 0).length <= 50;
+      },
+      message: 'Bio cannot exceed 50 words!'
+    }
+  },
+  gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
+  country: { type: String, default: '' },
+  dob: { type: Date },
   coins: { type: Number, default: 0 },
   level: { type: Number, default: 1 },
   xp: { type: Number, default: 0 },
@@ -18,6 +31,7 @@ const userSchema = new mongoose.Schema({
     roomsJoined: { type: Number, default: 0 }
   },
   friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   refreshTokens: [{ type: String }]
 }, { timestamps: true });
 

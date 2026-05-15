@@ -12,7 +12,8 @@ const RegisterPage = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [avatar, setAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -22,15 +23,24 @@ const RegisterPage = () => {
 
   const handleAvatarChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      // In a real app, we would upload to Cloudinary and get URL
-      // For now, we'll just mock it or leave it empty in the actual DB
-      setAvatar(URL.createObjectURL(e.target.files[0]));
+      const file = e.target.files[0];
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    const success = await register({ username, email, password });
+    
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('email', email);
+    formData.append('password', password);
+    if (avatarFile) {
+      formData.append('avatar', avatarFile);
+    }
+
+    const success = await register(formData);
     if (success) {
       toast.success('Account created successfully!');
       navigate('/lobby');
@@ -60,8 +70,8 @@ const RegisterPage = () => {
           <div className="flex justify-center mb-6">
             <div className="relative group cursor-pointer">
               <div className="w-24 h-24 rounded-full bg-surfaceAlt border-2 border-dashed border-border overflow-hidden flex items-center justify-center transition-colors group-hover:border-primary">
-                {avatar ? (
-                  <img src={avatar} alt="Avatar preview" className="w-full h-full object-cover" />
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
                 ) : (
                   <FiCamera className="text-3xl text-white/40 group-hover:text-primary transition-colors" />
                 )}

@@ -30,7 +30,16 @@ const useAuthStore = create((set, get) => ({
   register: async (userData) => {
     try {
       set({ isLoading: true, error: null });
-      const response = await api.post('/auth/register', userData);
+      
+      let response;
+      if (userData instanceof FormData) {
+        response = await api.post('/auth/register', userData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        response = await api.post('/auth/register', userData);
+      }
+
       localStorage.setItem('accessToken', response.data.accessToken);
       set({ 
         user: response.data.user, 
@@ -71,7 +80,9 @@ const useAuthStore = create((set, get) => ({
       localStorage.removeItem('accessToken');
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
-  }
+  },
+
+  setUser: (user) => set({ user })
 }));
 
 export default useAuthStore;
