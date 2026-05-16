@@ -56,7 +56,7 @@ const GroupChatPage = () => {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !user?._id) return;
 
     socketRef.current.emit('send_group_message', {
       groupId: id,

@@ -8,6 +8,8 @@ export const socket = io(SOCKET_URL, {
 });
 
 export const connectSocket = (userId) => {
+  if (!userId) return; // Safety check
+  
   if (!socket.connected) {
     socket.connect();
     socket.on('connect', () => {
