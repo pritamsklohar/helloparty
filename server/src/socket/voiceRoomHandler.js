@@ -34,9 +34,16 @@ const broadcastSeatsUpdated = (io, roomId, room) => {
     }
   }));
   
+  const ownerData = room.owner ? {
+    userId: room.owner.userId,
+    username: room.owner.name,
+    avatarUrl: room.owner.avatar
+  } : null;
+  
   io.in(roomId).emit('peer:seats_updated', {
     seats: room.seats.map(u => u ? u.id : null),
-    seatsUsers
+    seatsUsers,
+    owner: ownerData
   });
 };
 
@@ -564,6 +571,19 @@ const voiceRoomHandler = (io, socket) => {
             } else {
               addRoomLog(currentRoom, `${oldOwnerName} left permanently. ${newOwnerCandidate.name} promoted from waiting list to owner.`);
             }
+
+            // Promote to owner in DB!
+            try {
+              const Room = require('../models/Room');
+              const User = require('../models/User');
+              const dbUser = await User.findOne({ username: newOwnerCandidate.name });
+              if (dbUser) {
+                await Room.findByIdAndUpdate(roomId, { host: dbUser._id });
+                console.log(`Updated room ${roomId} host to ${dbUser.username} in DB (delayed)`);
+              }
+            } catch (err) {
+              console.error("Failed to update room host in DB after promotion (delayed):", err.message);
+            }
             
             // Broadcast seats updated
             broadcastSeatsUpdated(io, roomId, currentRoom);
@@ -634,6 +654,19 @@ const voiceRoomHandler = (io, socket) => {
             addRoomLog(room, `${oldOwnerName} left. ${newOwnerCandidate.name} promoted from seat ${originalSeatNum} to owner.`);
           } else {
             addRoomLog(room, `${oldOwnerName} left. ${newOwnerCandidate.name} promoted from waiting list to owner.`);
+          }
+
+          // Promote to owner in DB!
+          try {
+            const Room = require('../models/Room');
+            const User = require('../models/User');
+            const dbUser = await User.findOne({ username: newOwnerCandidate.name });
+            if (dbUser) {
+              await Room.findByIdAndUpdate(roomId, { host: dbUser._id });
+              console.log(`Updated room ${roomId} host to ${dbUser.username} in DB (immediate)`);
+            }
+          } catch (err) {
+            console.error("Failed to update room host in DB after promotion (immediate):", err.message);
           }
         } else {
           // Close Room and delete from DB!

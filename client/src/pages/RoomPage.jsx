@@ -142,12 +142,24 @@ const RoomPage = () => {
           updateRemotePeers();
         });
 
-        socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers }) => {
+         socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers, owner }) => {
           setSeats(updatedSeats);
           if (seatsUsers) {
             seatsUsers.forEach(({ socketId, user: userData }) => {
               socketToUserRef.current.set(socketId, userData);
             });
+          }
+          if (owner) {
+            setRoomData(prev => prev ? {
+              ...prev,
+              host: {
+                ...prev.host,
+                _id: owner.userId,
+                id: owner.userId,
+                username: owner.username,
+                avatarUrl: owner.avatarUrl
+              }
+            } : prev);
           }
         });
 
