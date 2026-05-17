@@ -123,23 +123,26 @@ const useChatStore = create((set, get) => ({
   },
 
   // Add a new incoming/outgoing message to the cache
-  addMessage: (chatId, message) => {
+  addMessage: (chatId, message, isActive = false) => {
     set((state) => {
       const currentMessages = state.messagesCache[chatId] || [];
       // Prevent duplicates
       if (currentMessages.some((m) => (m._id && m._id === message._id) || (m.id && m.id === message.id))) {
         return state;
       }
+      
+      const finalMessage = isActive ? { ...message, isRead: true } : message;
+      
       return {
         messagesCache: {
           ...state.messagesCache,
-          [chatId]: [...currentMessages, message]
+          [chatId]: [...currentMessages, finalMessage]
         }
       };
     });
 
     // Also trigger update to the conversations list in local state to keep it real-time
-    get().updateConversationLastMessage(chatId, message);
+    get().updateConversationLastMessage(chatId, message, isActive);
   },
 
   // Locally delete/unsend a message from the cache
@@ -156,7 +159,7 @@ const useChatStore = create((set, get) => ({
   },
 
   // Helper to dynamically update the last message & unread status in the local conversation list
-  updateConversationLastMessage: (chatId, message) => {
+  updateConversationLastMessage: (chatId, message, isActive = false) => {
     set((state) => {
       const conversations = state.conversations.map((conv) => {
         // Match either direct chat (using uid or _id) or group chat
@@ -166,7 +169,7 @@ const useChatStore = create((set, get) => ({
             ...conv,
             lastMessage: message.text || message.content || '',
             lastMessageTime: message.createdAt || new Date().toISOString(),
-            unreadCount: message.isOwn ? conv.unreadCount : (conv.unreadCount || 0) + 1
+            unreadCount: (isActive || message.isOwn || message.sender === get().conversations.find(c => c._id === chatId)?.uid) ? 0 : (conv.unreadCount || 0) + 1
           };
         }
         return conv;

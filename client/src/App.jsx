@@ -59,16 +59,47 @@ const AppContent = () => {
       // Setup global message listeners
       const handleReceivePrivateMessage = (msg) => {
         const chatId = msg.sender === user._id ? msg.receiver : msg.sender;
-        addMessage(chatId, msg);
+        
+        // Dynamically check if currently viewing this direct chat
+        const currentPath = window.location.pathname;
+        const isChatRoute = currentPath.startsWith('/chat/') && currentPath !== '/chat';
+        let isActive = false;
+
+        if (isChatRoute) {
+          const activeUid = currentPath.split('/').pop();
+          const activeUser = useChatStore.getState().usersCache[activeUid];
+          if (activeUser && activeUser._id === chatId) {
+            isActive = true;
+          }
+        }
+
+        addMessage(chatId, msg, isActive);
+
+        // If looking at this chat, tell backend to mark as read immediately
+        if (isActive) {
+          socket.emit('mark_as_read', { senderId: chatId, receiverId: user._id });
+        }
       };
 
       const handleMessageSent = (msg) => {
         const chatId = msg.sender === user._id ? msg.receiver : msg.sender;
-        addMessage(chatId, msg);
+        addMessage(chatId, msg, true); // It's our own message, so it's always read
       };
 
       const handleReceiveGroupMessage = (msg) => {
-        addMessage(msg.groupId, msg);
+        // Dynamically check if currently viewing this group chat
+        const currentPath = window.location.pathname;
+        const isGroupRoute = currentPath.startsWith('/groups/') && currentPath !== '/groups';
+        let isActive = false;
+
+        if (isGroupRoute) {
+          const activeGroupId = currentPath.split('/').pop();
+          if (activeGroupId === msg.groupId) {
+            isActive = true;
+          }
+        }
+
+        addMessage(msg.groupId, msg, isActive);
       };
 
       const handleMessageDeleted = (data) => {
