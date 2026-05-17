@@ -71,11 +71,16 @@ const RoomPage = () => {
       if (isInitializingRef.current || socketRef.current) return;
       isInitializingRef.current = true;
 
+      let stream = null;
       try {
         console.log('Initializing owner/user mic. Default micEnabled: true');
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         localStreamRef.current = stream;
-        
+      } catch (err) {
+        console.warn('Microphone permission denied or unavailable. Entering in listen-only mode:', err);
+      }
+
+      try {
         socketRef.current = io(import.meta.env.VITE_API_URL, {
           withCredentials: true
         });
@@ -282,12 +287,16 @@ const RoomPage = () => {
   };
 
   const sitDown = (index) => {
-    socketRef.current.emit('peer:sit_down', { roomId: id, seatIndex: index });
+    if (socketRef.current) {
+      socketRef.current.emit('peer:sit_down', { roomId: id, seatIndex: index });
+    }
     setSeatModal(null);
   };
 
   const standUp = () => {
-    socketRef.current.emit('peer:stand_up', { roomId: id });
+    if (socketRef.current) {
+      socketRef.current.emit('peer:stand_up', { roomId: id });
+    }
     setSeatModal(null);
   };
 
@@ -337,7 +346,9 @@ const RoomPage = () => {
     };
     
     setMessages(prev => [...prev, newMsg]);
-    socketRef.current.emit('peer:send_message', { roomId: id, message: message });
+    if (socketRef.current) {
+      socketRef.current.emit('peer:send_message', { roomId: id, message: message });
+    }
     setMessage('');
   };
 
