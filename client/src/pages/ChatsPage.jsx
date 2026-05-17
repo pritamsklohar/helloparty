@@ -5,6 +5,7 @@ import { FiSearch, FiPlus, FiUserPlus, FiUsers, FiList, FiMessageSquare, FiX } f
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import useChatStore from '../store/chatStore';
+import useAuthStore from '../store/authStore';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
