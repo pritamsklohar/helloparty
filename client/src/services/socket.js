@@ -4,7 +4,8 @@ const SOCKET_URL = import.meta.env.VITE_API_URL;
 
 export const socket = io(SOCKET_URL, {
   withCredentials: true,
-  autoConnect: false
+  autoConnect: false,
+  transports: ['websocket']
 });
 
 // Register the connect listener exactly once at the module level to prevent accumulation

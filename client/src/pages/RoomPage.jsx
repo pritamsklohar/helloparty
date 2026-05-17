@@ -121,7 +121,8 @@ const RoomPage = () => {
       try {
         if (!socketRef.current) {
           socketRef.current = io(import.meta.env.VITE_API_URL, {
-            withCredentials: true
+            withCredentials: true,
+            transports: ['websocket']
           });
         }
 
