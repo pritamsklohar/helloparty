@@ -16,7 +16,7 @@ const RoomPage = () => {
   const navigate = useNavigate();
   
   const {
-    activeRoom,
+    activeRoom, setActiveRoom,
     isMinimized, setIsMinimized,
     roomData, setRoomData,
     isMuted, setIsMuted,
@@ -150,16 +150,14 @@ const RoomPage = () => {
             });
           }
           if (owner) {
-            setRoomData(prev => prev ? {
-              ...prev,
-              host: {
-                ...prev.host,
-                _id: owner.userId,
-                id: owner.userId,
-                username: owner.username,
-                avatarUrl: owner.avatarUrl
-              }
-            } : prev);
+            const updatedHost = {
+              _id: owner.userId,
+              id: owner.userId,
+              username: owner.username,
+              avatarUrl: owner.avatarUrl
+            };
+            setRoomData(prev => prev ? { ...prev, host: updatedHost } : prev);
+            setActiveRoom(prev => prev ? { ...prev, host: updatedHost } : prev);
           }
         });
 

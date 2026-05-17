@@ -45,19 +45,6 @@ export const VoiceRoomProvider = ({ children }) => {
 
   const closeRoom = async () => {
     const roomId = activeRoom?._id || roomData?._id;
-    
-    // 1. If host is leaving and closing
-    const currentUser = useAuthStore.getState().user;
-    const hostId = activeRoom?.host?._id || activeRoom?.host;
-    const isHost = hostId && (hostId === currentUser?._id || hostId === currentUser?.id);
-    
-    if (activeRoom && isHost) {
-      try {
-        await api.delete(`/rooms/${activeRoom._id}`);
-      } catch (error) {
-        console.error('Failed to remove room from DB:', error);
-      }
-    }
 
     // 2. Shut down Socket and clear signaling channels
     if (socketRef.current) {

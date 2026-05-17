@@ -575,12 +575,8 @@ const voiceRoomHandler = (io, socket) => {
             // Promote to owner in DB!
             try {
               const Room = require('../models/Room');
-              const User = require('../models/User');
-              const dbUser = await User.findOne({ username: newOwnerCandidate.name });
-              if (dbUser) {
-                await Room.findByIdAndUpdate(roomId, { host: dbUser._id });
-                console.log(`Updated room ${roomId} host to ${dbUser.username} in DB (delayed)`);
-              }
+              await Room.findByIdAndUpdate(roomId, { host: newOwnerCandidate.userId });
+              console.log(`Updated room ${roomId} host to ${newOwnerCandidate.name} in DB (delayed)`);
             } catch (err) {
               console.error("Failed to update room host in DB after promotion (delayed):", err.message);
             }
@@ -661,12 +657,8 @@ const voiceRoomHandler = (io, socket) => {
           // Promote to owner in DB!
           try {
             const Room = require('../models/Room');
-            const User = require('../models/User');
-            const dbUser = await User.findOne({ username: newOwnerCandidate.name });
-            if (dbUser) {
-              await Room.findByIdAndUpdate(roomId, { host: dbUser._id });
-              console.log(`Updated room ${roomId} host to ${dbUser.username} in DB (immediate)`);
-            }
+            await Room.findByIdAndUpdate(roomId, { host: newOwnerCandidate.userId });
+            console.log(`Updated room ${roomId} host to ${newOwnerCandidate.name} in DB (immediate)`);
           } catch (err) {
             console.error("Failed to update room host in DB after promotion (immediate):", err.message);
           }
