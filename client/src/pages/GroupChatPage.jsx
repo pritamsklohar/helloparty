@@ -11,34 +11,33 @@ const GroupChatPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [group, setGroup] = useState(null);
   const [inputText, setInputText] = useState('');
-  const [loadingGroup, setLoadingGroup] = useState(true);
   const messagesEndRef = useRef();
 
-  const { messagesCache, loadingMessages, fetchGroupHistory } = useChatStore();
+  const { 
+    messagesCache, 
+    loadingMessages, 
+    fetchGroupHistory,
+    groupsCache,
+    loadingGroups,
+    fetchGroupDetail
+  } = useChatStore();
+
+  const group = groupsCache[id] || null;
   const messages = messagesCache[id] || [];
 
   useEffect(() => {
-    const fetchGroup = async () => {
-      try {
-        setLoadingGroup(true);
-        const res = await api.get(`/groups/${id}`);
-        setGroup(res.data);
-      } catch (err) {
+    if (id) {
+      const cachedGroup = groupsCache[id];
+      fetchGroupDetail(id, !!cachedGroup).catch(() => {
         toast.error('Group not found');
         navigate('/chat');
-      } finally {
-        setLoadingGroup(false);
-      }
-    };
+      });
 
-    if (id) {
-      fetchGroup();
-      const cached = messagesCache[id] || [];
-      fetchGroupHistory(id, cached.length > 0);
+      const cachedMsgs = messagesCache[id] || [];
+      fetchGroupHistory(id, cachedMsgs.length > 0);
     }
-  }, [id, navigate, fetchGroupHistory]);
+  }, [id, navigate, fetchGroupDetail, fetchGroupHistory]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,7 +70,7 @@ const GroupChatPage = () => {
     }
   };
 
-  if (loadingGroup || (loadingMessages[id] && messages.length === 0)) return (
+  if (!group || (loadingMessages[id] && messages.length === 0)) return (
     <div className="flex h-screen bg-bg items-center justify-center">
        <div className="w-10 h-10 border-4 border-white/10 border-t-primary rounded-full animate-spin" />
     </div>

@@ -5,8 +5,65 @@ const useChatStore = create((set, get) => ({
   conversations: [],
   // Map of chatId (either userId for direct chat or groupId for group chat) -> array of messages
   messagesCache: {},
+  // Caching user profiles and group metadata
+  usersCache: {},
+  groupsCache: {},
   loadingConversations: false,
   loadingMessages: {},
+  loadingUsers: {},
+  loadingGroups: {},
+
+  // Fetch individual user detail with cache support
+  fetchUserDetail: async (uid, silent = false) => {
+    if (!silent) {
+      set((state) => ({
+        loadingUsers: { ...state.loadingUsers, [uid]: true }
+      }));
+    }
+    try {
+      const res = await api.get(`/users/${uid}`);
+      const userProfile = res.data.user;
+      set((state) => ({
+        usersCache: {
+          ...state.usersCache,
+          [uid]: userProfile,
+          [userProfile._id]: userProfile
+        },
+        loadingUsers: { ...state.loadingUsers, [uid]: false }
+      }));
+      return userProfile;
+    } catch (err) {
+      console.error(`Error fetching user profile ${uid}:`, err);
+      set((state) => ({
+        loadingUsers: { ...state.loadingUsers, [uid]: false }
+      }));
+      throw err;
+    }
+  },
+
+  // Fetch group detail with cache support
+  fetchGroupDetail: async (groupId, silent = false) => {
+    if (!silent) {
+      set((state) => ({
+        loadingGroups: { ...state.loadingGroups, [groupId]: true }
+      }));
+    }
+    try {
+      const res = await api.get(`/groups/${groupId}`);
+      const groupData = res.data;
+      set((state) => ({
+        groupsCache: { ...state.groupsCache, [groupId]: groupData },
+        loadingGroups: { ...state.loadingGroups, [groupId]: false }
+      }));
+      return groupData;
+    } catch (err) {
+      console.error(`Error fetching group metadata ${groupId}:`, err);
+      set((state) => ({
+        loadingGroups: { ...state.loadingGroups, [groupId]: false }
+      }));
+      throw err;
+    }
+  },
 
   // Fetch all conversations in the background
   fetchConversations: async (silent = false) => {

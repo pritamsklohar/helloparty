@@ -7,12 +7,12 @@ import toast from 'react-hot-toast';
 
 import useChatStore from '../store/chatStore';
 import useAuthStore from '../store/authStore';
+import { socket } from '../services/socket';
 
 const ChatRoomPage = () => {
   const { uid } = useParams();
   const navigate = useNavigate();
   const { user: currentUser } = useAuthStore();
-  const [user, setUser] = useState(null);
   const [message, setMessage] = useState('');
   const [showOptions, setShowOptions] = useState(false);
   const [showPlusOptions, setShowPlusOptions] = useState(false);
@@ -23,21 +23,28 @@ const ChatRoomPage = () => {
   const longPressTimer = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const { messagesCache, loadingMessages, fetchPrivateHistory, clearUnreadCount } = useChatStore();
+  const { 
+    messagesCache, 
+    loadingMessages, 
+    fetchPrivateHistory, 
+    clearUnreadCount,
+    usersCache,
+    loadingUsers,
+    fetchUserDetail
+  } = useChatStore();
+
+  const user = usersCache[uid] || null;
   const messages = user ? (messagesCache[user._id] || []) : [];
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await api.get(`/users/${uid}`);
-        setUser(res.data.user);
-      } catch (err) {
+    if (uid) {
+      const cachedProfile = usersCache[uid];
+      fetchUserDetail(uid, !!cachedProfile).catch(() => {
         toast.error('User not found');
         navigate('/chat');
-      }
-    };
-    if (uid) fetchUser();
-  }, [uid, navigate]);
+      });
+    }
+  }, [uid, navigate, fetchUserDetail]);
 
   useEffect(() => {
     if (user) {
