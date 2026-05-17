@@ -6,6 +6,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 import useChatStore from '../store/chatStore';
+import useAuthStore from '../store/authStore';
 
 const ChatRoomPage = () => {
   const { uid } = useParams();
