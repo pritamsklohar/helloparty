@@ -83,7 +83,7 @@ const AppContent = () => {
 
       const handleMessageSent = (msg) => {
         const chatId = msg.sender === user._id ? msg.receiver : msg.sender;
-        addMessage(chatId, msg, true); // It's our own message, so it's always read
+        addMessage(chatId, msg, false); // It is our own message, but remains 'sent' until the recipient reads it!
       };
 
       const handleReceiveGroupMessage = (msg) => {
