@@ -7,15 +7,22 @@ export const socket = io(SOCKET_URL, {
   autoConnect: false
 });
 
+// Register the connect listener exactly once at the module level to prevent accumulation
+socket.on('connect', () => {
+  const userId = socket.authUserId;
+  if (userId) {
+    socket.emit('join_personal', userId);
+    console.log('Socket connected and joined personal room:', userId);
+  }
+});
+
 export const connectSocket = (userId) => {
   if (!userId) return; // Safety check
   
+  socket.authUserId = userId;
+  
   if (!socket.connected) {
     socket.connect();
-    socket.on('connect', () => {
-      socket.emit('join_personal', userId);
-      console.log('Socket connected and joined personal room:', userId);
-    });
   } else {
     socket.emit('join_personal', userId);
   }
