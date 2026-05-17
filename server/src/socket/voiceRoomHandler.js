@@ -1,4 +1,5 @@
 const Room = require('../models/Room');
+const User = require('../models/User');
 
 // In-memory unified state: roomId -> RoomObject
 const voiceRooms = new Map();
@@ -19,6 +20,23 @@ const addRoomLog = (room, message) => {
   const time = getFormattedTime();
   room.logs.push({ time, message });
   return `${time} — ${message}`;
+};
+
+const broadcastSeatsUpdated = (io, roomId, room) => {
+  const seatsUsers = room.seats.filter(u => u !== null).map(u => ({
+    socketId: u.id,
+    user: {
+      userId: u.userId,
+      uid: u.uid,
+      username: u.name,
+      avatarUrl: u.avatar
+    }
+  }));
+  
+  io.in(roomId).emit('peer:seats_updated', {
+    seats: room.seats.map(u => u ? u.id : null),
+    seatsUsers
+  });
 };
 
 const voiceRoomHandler = (io, socket) => {
@@ -92,16 +110,35 @@ const voiceRoomHandler = (io, socket) => {
         }
       }
 
+      if (existingUser) {
+        // Enforce valid UID on rejoin as well
+        if ((!existingUser.uid || existingUser.uid === socket.id) && user.userId) {
+          const dbUser = await User.findById(user.userId).catch(() => null);
+          if (dbUser) {
+            existingUser.uid = dbUser.uid;
+          }
+        }
+      }
+
       if (!existingUser) {
         // Determine role: if owner is not yet assigned, first to join (or matching dbRoom host) is owner
         const dbRoom = await Room.findById(roomId).catch(() => null);
         const isDbHost = dbRoom && dbRoom.host && dbRoom.host.toString() === user.userId;
         const isOwnerUser = room.owner === null && (isDbHost || room.activeMembers === 0);
 
+        // Fetch actual UID from Mongo if frontend failed to provide it
+        let actualUid = user.uid;
+        if ((!actualUid || actualUid === socket.id) && user.userId) {
+          const dbUser = await User.findById(user.userId).catch(() => null);
+          if (dbUser) {
+            actualUid = dbUser.uid;
+          }
+        }
+
         const newUser = {
           id: socket.id,
           userId: user.userId,
-          uid: user.uid,
+          uid: actualUid,
           name: user.username,
           handle: user.username,
           avatar: user.avatarUrl || '👤',
@@ -185,9 +222,7 @@ const voiceRoomHandler = (io, socket) => {
       });
 
       // Broadcast seats updated to everyone
-      io.in(roomId).emit('peer:seats_updated', {
-        seats: room.seats.map(u => u ? u.id : null)
-      });
+      broadcastSeatsUpdated(io, roomId, room);
 
     } catch (err) {
       console.error("Error in peer:join_room:", err.message);
@@ -245,9 +280,7 @@ const voiceRoomHandler = (io, socket) => {
       updateActiveMembersCount(room);
 
       // Broadcast updated seats to all participants in real-time
-      io.in(roomId).emit('peer:seats_updated', {
-        seats: room.seats.map(u => u ? u.id : null)
-      });
+      broadcastSeatsUpdated(io, roomId, room);
     } catch (err) {
       console.error("Error in peer:sit_down:", err.message);
     }
@@ -277,9 +310,7 @@ const voiceRoomHandler = (io, socket) => {
         updateActiveMembersCount(room);
 
         // Broadcast updated seats in real-time
-        io.in(roomId).emit('peer:seats_updated', {
-          seats: room.seats.map(u => u ? u.id : null)
-        });
+        broadcastSeatsUpdated(io, roomId, room);
       }
     } catch (err) {
       console.error("Error in peer:stand_up:", err.message);
@@ -369,9 +400,7 @@ const voiceRoomHandler = (io, socket) => {
         updateActiveMembersCount(room);
 
         // Broadcast updated seats in real-time
-        io.in(roomId).emit('peer:seats_updated', {
-          seats: room.seats.map(u => u ? u.id : null)
-        });
+        broadcastSeatsUpdated(io, roomId, room);
 
         // Notify target client to stand up
         const targetSocket = io.sockets.sockets.get(targetSocketId);
@@ -542,9 +571,7 @@ const voiceRoomHandler = (io, socket) => {
     updateActiveMembersCount(room);
 
     // Broadcast seats updated
-    io.in(roomId).emit('peer:seats_updated', {
-      seats: room.seats.map(u => u ? u.id : null)
-    });
+    broadcastSeatsUpdated(io, roomId, room);
 
     // Notify user left
     io.in(roomId).emit('peer:user_left', { userId: socketId });

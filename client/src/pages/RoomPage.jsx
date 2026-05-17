@@ -93,6 +93,15 @@ const RoomPage = () => {
 
         socketRef.current.on('connect', () => {
           myUserId.current = socketRef.current.id;
+          
+          // Map my own socket ID to my user details
+          socketToUserRef.current.set(socketRef.current.id, {
+            userId: currentUser?._id || currentUser?.id,
+            uid: currentUser?.uid,
+            username: currentUser?.username,
+            avatarUrl: currentUser?.avatarUrl
+          });
+
           socketRef.current.emit('peer:join_room', { 
             roomId: id, 
             user: {
@@ -116,8 +125,13 @@ const RoomPage = () => {
           updateRemotePeers();
         });
 
-        socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats }) => {
+        socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers }) => {
           setSeats(updatedSeats);
+          if (seatsUsers) {
+            seatsUsers.forEach(({ socketId, user: userData }) => {
+              socketToUserRef.current.set(socketId, userData);
+            });
+          }
         });
 
         socketRef.current.on('peer:new_user_joined', ({ socketId, user: userData }) => {

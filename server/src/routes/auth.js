@@ -51,7 +51,7 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
 
     res.status(201).json({
       accessToken,
-      user: { id: user._id, username: user.username, email: user.email, avatarUrl: user.avatarUrl, coins: user.coins }
+      user: { id: user._id, uid: user.uid, username: user.username, email: user.email, avatarUrl: user.avatarUrl, coins: user.coins }
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -80,7 +80,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       accessToken,
-      user: { id: user._id, username: user.username, email: user.email, avatarUrl: user.avatarUrl, coins: user.coins }
+      user: { id: user._id, uid: user.uid, username: user.username, email: user.email, avatarUrl: user.avatarUrl, coins: user.coins }
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
