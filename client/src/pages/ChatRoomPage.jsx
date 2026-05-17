@@ -5,8 +5,7 @@ import { FiChevronLeft, FiMoreVertical, FiSmile, FiGift, FiPlus, FiSend, FiUser,
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
-import { socket, connectSocket } from '../services/socket';
-import useAuthStore from '../store/authStore';
+import useChatStore from '../store/chatStore';
 
 const ChatRoomPage = () => {
   const { uid } = useParams();
@@ -14,7 +13,6 @@ const ChatRoomPage = () => {
   const { user: currentUser } = useAuthStore();
   const [user, setUser] = useState(null);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
   const [showOptions, setShowOptions] = useState(false);
   const [showPlusOptions, setShowPlusOptions] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
@@ -23,6 +21,9 @@ const ChatRoomPage = () => {
   const [contextMenu, setContextMenu] = useState({ x: 0, y: 0, show: false, messageId: null });
   const longPressTimer = useRef(null);
   const messagesEndRef = useRef(null);
+
+  const { messagesCache, loadingMessages, fetchPrivateHistory, clearUnreadCount } = useChatStore();
+  const messages = user ? (messagesCache[user._id] || []) : [];
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -38,40 +39,6 @@ const ChatRoomPage = () => {
   }, [uid, navigate]);
 
   useEffect(() => {
-    if (currentUser) {
-      connectSocket(currentUser._id);
-    }
-    
-    const handleReceiveMessage = (data) => {
-      // Check if message belongs to this chat
-      if (data.sender === user?._id || data.receiver === user?._id) {
-        setMessages(prev => {
-          if (prev.some(m => m._id === data._id)) return prev;
-          return [...prev, data];
-        });
-
-        // Mark as read if we are the receiver and this is the active chat
-        if (data.receiver === currentUser?._id && data.sender === user?._id) {
-          socket.emit('mark_as_read', { senderId: user._id, receiverId: currentUser._id });
-        }
-      }
-    };
-
-    const handleMessagesSeen = (data) => {
-      if (data.seenBy === user?._id) {
-        setMessages(prev => prev.map(m => ({ ...m, isRead: true })));
-      }
-    };
-
-    const handleMessageDeleted = (data) => {
-      setMessages(prev => prev.filter(m => (m._id || m.id) !== data.messageId));
-    };
-
-    socket.on('receive_private_message', handleReceiveMessage);
-    socket.on('message_sent', handleReceiveMessage);
-    socket.on('messages_seen', handleMessagesSeen);
-    socket.on('message_deleted', handleMessageDeleted);
-
     if (user) {
       socket.emit('check_online_status', user._id);
     }
@@ -94,38 +61,43 @@ const ChatRoomPage = () => {
       }
     };
 
+    const handleMessagesSeen = (data) => {
+      if (data.seenBy === user?._id) {
+        // Mark all cached messages in this conversation as read
+        const userMessages = useChatStore.getState().messagesCache[user._id] || [];
+        const updated = userMessages.map(m => ({ ...m, isRead: true }));
+        useChatStore.setState(state => ({
+          messagesCache: { ...state.messagesCache, [user._id]: updated }
+        }));
+      }
+    };
+
     socket.on('user_status_change', handleStatusChange);
     socket.on('user_status_res', handleStatusRes);
     socket.on('user_typing_status', handleTypingStatus);
+    socket.on('messages_seen', handleMessagesSeen);
 
     return () => {
-      socket.off('receive_private_message', handleReceiveMessage);
-      socket.off('message_sent', handleReceiveMessage);
-      socket.off('messages_seen', handleMessagesSeen);
-      socket.off('message_deleted', handleMessageDeleted);
       socket.off('user_status_change', handleStatusChange);
       socket.off('user_status_res', handleStatusRes);
       socket.off('user_typing_status', handleTypingStatus);
+      socket.off('messages_seen', handleMessagesSeen);
     };
-  }, [currentUser, user]);
+  }, [user]);
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await api.get(`/users/chat/history/${user._id}`);
-        setMessages(res.data.messages);
-      } catch (err) {
-        console.error('Error fetching history:', err);
-      }
-    };
     if (user) {
-      fetchHistory();
-      // Mark as read when entering the chat
+      const cachedList = messagesCache[user._id] || [];
+      // Fetch in background silently if we already have messages cached
+      fetchPrivateHistory(user._id, cachedList.length > 0);
+      
+      // Clear unread count locally and mark as read on server
+      clearUnreadCount(user._id);
       if (currentUser) {
         socket.emit('mark_as_read', { senderId: user._id, receiverId: currentUser._id });
       }
     }
-  }, [user, currentUser]);
+  }, [user, currentUser, fetchPrivateHistory, clearUnreadCount]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -263,7 +235,12 @@ const ChatRoomPage = () => {
                       <FiSlash className="text-lg" /> Block User
                     </button>
                     <div className="h-[1px] bg-white/10 my-1 mx-3" />
-                    <button onClick={() => { setMessages([]); setShowOptions(false); }} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-white/10 rounded-xl transition-colors text-left">
+                    <button onClick={() => { 
+                      useChatStore.setState(state => ({
+                        messagesCache: { ...state.messagesCache, [user._id]: [] }
+                      }));
+                      setShowOptions(false); 
+                    }} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-white/10 rounded-xl transition-colors text-left">
                       <FiTrash2 className="text-lg" /> Clear Chat
                     </button>
                   </div>
@@ -273,10 +250,14 @@ const ChatRoomPage = () => {
           </AnimatePresence>
         </div>
       </header>
-
+ 
       {/* Messages */}
       <main className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4">
-        {messages.length === 0 ? (
+        {loadingMessages[user._id] && messages.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-10 h-10 border-4 border-surface border-t-primary rounded-full animate-spin"></div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center opacity-20 select-none pointer-events-none">
             <FiMessageCircle size={80} className="mb-4" />
             <p className="text-sm font-bold uppercase tracking-widest text-center">Say hello to {user.username}!</p>

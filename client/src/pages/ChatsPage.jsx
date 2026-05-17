@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiSearch, FiPlus, FiUserPlus, FiUsers, FiList, FiMessageSquare, FiX } from 'react-icons/fi';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { socket, connectSocket } from '../services/socket';
-import useAuthStore from '../store/authStore';
+import useChatStore from '../store/chatStore';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
@@ -14,21 +13,9 @@ const ChatsPage = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [searchUserId, setSearchUserId] = useState('');
-  const [chats, setChats] = useState([]); 
-  const [loading, setLoading] = useState(true);
   const [requestCount, setRequestCount] = useState(0);
 
-  const fetchConversations = async (showLoading = true) => {
-    try {
-      if (showLoading) setLoading(true);
-      const res = await api.get('/users/chat/conversations');
-      setChats(res.data.conversations);
-    } catch (err) {
-      console.error('Error fetching conversations:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { conversations, loadingConversations, fetchConversations } = useChatStore();
 
   const fetchRequests = async () => {
     try {
@@ -40,28 +27,11 @@ const ChatsPage = () => {
   };
 
   useEffect(() => {
-    fetchConversations();
+    // Show spinner only if no conversations exist in cache yet
+    const isCacheEmpty = conversations.length === 0;
+    fetchConversations(!isCacheEmpty);
     fetchRequests();
-  }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      connectSocket(currentUser._id);
-    }
-
-    const handleNewMessage = () => {
-      // Refresh the list when a new message is sent or received
-      fetchConversations(false);
-    };
-
-    socket.on('receive_private_message', handleNewMessage);
-    socket.on('message_sent', handleNewMessage);
-
-    return () => {
-      socket.off('receive_private_message', handleNewMessage);
-      socket.off('message_sent', handleNewMessage);
-    };
-  }, [currentUser]);
+  }, [fetchConversations]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg relative">
@@ -164,13 +134,13 @@ const ChatsPage = () => {
       {/* Main Content: Chat List */}
       <main className="flex-1 overflow-y-auto pt-24 pb-24 px-4 scroll-smooth">
         <div className="max-w-3xl mx-auto h-full">
-          {loading ? (
+          {loadingConversations && conversations.length === 0 ? (
             <div className="flex justify-center items-center h-[50vh]">
               <div className="w-8 h-8 border-4 border-surface border-t-primary rounded-full animate-spin"></div>
             </div>
-          ) : chats.length > 0 ? (
+          ) : conversations.length > 0 ? (
             <div className="space-y-2 mt-4">
-              {chats.filter(chat => chat.username.toLowerCase().includes(searchQuery.toLowerCase())).map(chat => (
+              {conversations.filter(chat => chat.username.toLowerCase().includes(searchQuery.toLowerCase())).map(chat => (
                 <div 
                   key={chat._id} 
                   onClick={() => navigate(chat.isGroup ? `/groups/${chat._id}` : `/chat/${chat.uid}`)}

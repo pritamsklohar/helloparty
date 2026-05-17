@@ -6,7 +6,6 @@ import useAuthStore from '../store/authStore';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
-import { socket, connectSocket } from '../services/socket';
 import { useRef } from 'react';
 
 const EditProfilePage = () => {

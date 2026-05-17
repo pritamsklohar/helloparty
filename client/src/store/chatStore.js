@@ -1,0 +1,141 @@
+import { create } from 'zustand';
+import api from '../services/api';
+
+const useChatStore = create((set, get) => ({
+  conversations: [],
+  // Map of chatId (either userId for direct chat or groupId for group chat) -> array of messages
+  messagesCache: {},
+  loadingConversations: false,
+  loadingMessages: {},
+
+  // Fetch all conversations in the background
+  fetchConversations: async (silent = false) => {
+    if (!silent) set({ loadingConversations: true });
+    try {
+      const res = await api.get('/users/chat/conversations');
+      const conversations = res.data.conversations;
+      set({ conversations, loadingConversations: false });
+    } catch (err) {
+      console.error('Error fetching conversations:', err);
+      set({ loadingConversations: false });
+    }
+  },
+
+  // Fetch private chat history for a user
+  fetchPrivateHistory: async (userId, silent = false) => {
+    if (!silent) {
+      set((state) => ({
+        loadingMessages: { ...state.loadingMessages, [userId]: true }
+      }));
+    }
+    try {
+      const res = await api.get(`/users/chat/history/${userId}`);
+      const messages = res.data.messages;
+      set((state) => ({
+        messagesCache: { ...state.messagesCache, [userId]: messages },
+        loadingMessages: { ...state.loadingMessages, [userId]: false }
+      }));
+    } catch (err) {
+      console.error(`Error fetching history for user ${userId}:`, err);
+      set((state) => ({
+        loadingMessages: { ...state.loadingMessages, [userId]: false }
+      }));
+    }
+  },
+
+  // Fetch group chat history
+  fetchGroupHistory: async (groupId, silent = false) => {
+    if (!silent) {
+      set((state) => ({
+        loadingMessages: { ...state.loadingMessages, [groupId]: true }
+      }));
+    }
+    try {
+      const res = await api.get(`/groups/${groupId}/messages`);
+      const messages = res.data;
+      set((state) => ({
+        messagesCache: { ...state.messagesCache, [groupId]: messages },
+        loadingMessages: { ...state.loadingMessages, [groupId]: false }
+      }));
+    } catch (err) {
+      console.error(`Error fetching history for group ${groupId}:`, err);
+      set((state) => ({
+        loadingMessages: { ...state.loadingMessages, [groupId]: false }
+      }));
+    }
+  },
+
+  // Add a new incoming/outgoing message to the cache
+  addMessage: (chatId, message) => {
+    set((state) => {
+      const currentMessages = state.messagesCache[chatId] || [];
+      // Prevent duplicates
+      if (currentMessages.some((m) => (m._id && m._id === message._id) || (m.id && m.id === message.id))) {
+        return state;
+      }
+      return {
+        messagesCache: {
+          ...state.messagesCache,
+          [chatId]: [...currentMessages, message]
+        }
+      };
+    });
+
+    // Also trigger update to the conversations list in local state to keep it real-time
+    get().updateConversationLastMessage(chatId, message);
+  },
+
+  // Locally delete/unsend a message from the cache
+  removeMessage: (chatId, messageId) => {
+    set((state) => {
+      const currentMessages = state.messagesCache[chatId] || [];
+      return {
+        messagesCache: {
+          ...state.messagesCache,
+          [chatId]: currentMessages.filter((m) => (m._id || m.id) !== messageId)
+        }
+      };
+    });
+  },
+
+  // Helper to dynamically update the last message & unread status in the local conversation list
+  updateConversationLastMessage: (chatId, message) => {
+    set((state) => {
+      const conversations = state.conversations.map((conv) => {
+        // Match either direct chat (using uid or _id) or group chat
+        const isMatch = conv._id === chatId || conv.uid === chatId || conv.id === chatId;
+        if (isMatch) {
+          return {
+            ...conv,
+            lastMessage: message.text || message.content || '',
+            lastMessageTime: message.createdAt || new Date().toISOString(),
+            unreadCount: message.isOwn ? conv.unreadCount : (conv.unreadCount || 0) + 1
+          };
+        }
+        return conv;
+      });
+
+      // Sort conversations so the one with the newest message rises to the top
+      const sortedConversations = [...conversations].sort(
+        (a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+      );
+
+      return { conversations: sortedConversations };
+    });
+  },
+
+  // Clear unread count for a conversation locally
+  clearUnreadCount: (chatId) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) => {
+        const isMatch = conv._id === chatId || conv.uid === chatId || conv.id === chatId;
+        if (isMatch) {
+          return { ...conv, unreadCount: 0 };
+        }
+        return conv;
+      })
+    }));
+  }
+}));
+
+export default useChatStore;

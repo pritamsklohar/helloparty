@@ -4,51 +4,41 @@ import { FiChevronLeft, FiSend, FiUsers, FiInfo, FiMoreVertical, FiLogOut, FiTra
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
-import io from 'socket.io-client';
-import toast from 'react-hot-toast';
+import useChatStore from '../store/chatStore';
+import { socket } from '../services/socket';
 
 const GroupChatPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [group, setGroup] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [loading, setLoading] = useState(true);
-  const socketRef = useRef();
+  const [loadingGroup, setLoadingGroup] = useState(true);
   const messagesEndRef = useRef();
 
+  const { messagesCache, loadingMessages, fetchGroupHistory } = useChatStore();
+  const messages = messagesCache[id] || [];
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchGroup = async () => {
       try {
-        const [groupRes, messagesRes] = await Promise.all([
-          api.get(`/groups/${id}`),
-          api.get(`/groups/${id}/messages`)
-        ]);
-        setGroup(groupRes.data);
-        setMessages(messagesRes.data);
+        setLoadingGroup(true);
+        const res = await api.get(`/groups/${id}`);
+        setGroup(res.data);
       } catch (err) {
         toast.error('Group not found');
-        navigate('/groups');
+        navigate('/chat');
       } finally {
-        setLoading(false);
+        setLoadingGroup(false);
       }
     };
 
-    fetchData();
-
-    socketRef.current = io(import.meta.env.VITE_API_URL);
-    socketRef.current.emit('join_group', id);
-
-    socketRef.current.on('receive_group_message', (message) => {
-      setMessages(prev => [...prev, message]);
-    });
-
-    return () => {
-      socketRef.current.emit('leave_group', id);
-      socketRef.current.disconnect();
-    };
-  }, [id, navigate]);
+    if (id) {
+      fetchGroup();
+      const cached = messagesCache[id] || [];
+      fetchGroupHistory(id, cached.length > 0);
+    }
+  }, [id, navigate, fetchGroupHistory]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -58,7 +48,7 @@ const GroupChatPage = () => {
     e.preventDefault();
     if (!inputText.trim() || !user?._id) return;
 
-    socketRef.current.emit('send_group_message', {
+    socket.emit('send_group_message', {
       groupId: id,
       senderId: user._id,
       text: inputText
@@ -81,7 +71,7 @@ const GroupChatPage = () => {
     }
   };
 
-  if (loading) return (
+  if (loadingGroup || (loadingMessages[id] && messages.length === 0)) return (
     <div className="flex h-screen bg-bg items-center justify-center">
        <div className="w-10 h-10 border-4 border-white/10 border-t-primary rounded-full animate-spin" />
     </div>

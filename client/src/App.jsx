@@ -26,6 +26,9 @@ import BottomNav from './components/layout/BottomNav';
 import { VoiceRoomProvider } from './context/VoiceRoomContext';
 import MinimizedRoom from './components/MinimizedRoom';
 
+import useChatStore from './store/chatStore';
+import { socket, connectSocket, disconnectSocket } from './services/socket';
+
 // Simple protected route wrapper
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -36,12 +39,71 @@ const ProtectedRoute = ({ children }) => {
 
 const AppContent = () => {
   const checkAuth = useAuthStore((state) => state.checkAuth);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const { fetchConversations, addMessage, removeMessage, conversations } = useChatStore();
   const location = useLocation();
   
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Global Socket Connection & Background Sync
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Connect to Socket server immediately
+      connectSocket(user._id);
+
+      // Fetch latest conversations in background silently
+      fetchConversations(true);
+
+      // Setup global message listeners
+      const handleReceivePrivateMessage = (msg) => {
+        const chatId = msg.sender === user._id ? msg.receiver : msg.sender;
+        addMessage(chatId, msg);
+      };
+
+      const handleMessageSent = (msg) => {
+        const chatId = msg.sender === user._id ? msg.receiver : msg.sender;
+        addMessage(chatId, msg);
+      };
+
+      const handleReceiveGroupMessage = (msg) => {
+        addMessage(msg.groupId, msg);
+      };
+
+      const handleMessageDeleted = (data) => {
+        // Remove from all cached chats
+        const cachedChats = useChatStore.getState().messagesCache;
+        Object.keys(cachedChats).forEach((chatId) => {
+          removeMessage(chatId, data.messageId);
+        });
+      };
+
+      socket.on('receive_private_message', handleReceivePrivateMessage);
+      socket.on('message_sent', handleMessageSent);
+      socket.on('receive_group_message', handleReceiveGroupMessage);
+      socket.on('message_deleted', handleMessageDeleted);
+
+      return () => {
+        socket.off('receive_private_message', handleReceivePrivateMessage);
+        socket.off('message_sent', handleMessageSent);
+        socket.off('receive_group_message', handleReceiveGroupMessage);
+        socket.off('message_deleted', handleMessageDeleted);
+        disconnectSocket();
+      };
+    }
+  }, [isAuthenticated, user, fetchConversations, addMessage, removeMessage]);
+
+  // Automatically join all groups in the socket background
+  useEffect(() => {
+    if (isAuthenticated && conversations.length > 0) {
+      conversations.forEach((conv) => {
+        if (conv.isGroup) {
+          socket.emit('join_group', conv._id);
+        }
+      });
+    }
+  }, [isAuthenticated, conversations]);
 
   const isRoomPage = location.pathname.startsWith('/room/');
   const isChatRoom = location.pathname.startsWith('/chat/') && location.pathname !== '/chat';
