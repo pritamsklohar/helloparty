@@ -102,37 +102,58 @@ const RoomPage = () => {
     };
     fetchRoom();
 
-    // 2. Initialize WebRTC & Socket (only if not already running globally!)
+    // 2. Initialize WebRTC & Socket (with listener re-binding support)
     const initWebRTC = async () => {
-      if (isInitializingRef.current || socketRef.current) return;
+      if (isInitializingRef.current) return;
       isInitializingRef.current = true;
 
-      let stream = null;
-      try {
-        console.log('Initializing owner/user mic. Default micEnabled: true');
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        localStreamRef.current = stream;
-      } catch (err) {
-        console.warn('Microphone permission denied or unavailable. Entering in listen-only mode:', err);
+      let stream = localStreamRef.current;
+      if (!stream) {
+        try {
+          console.log('Initializing owner/user mic. Default micEnabled: true');
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          localStreamRef.current = stream;
+        } catch (err) {
+          console.warn('Microphone permission denied or unavailable. Entering in listen-only mode:', err);
+        }
       }
 
       try {
-        socketRef.current = io(import.meta.env.VITE_API_URL, {
-          withCredentials: true
-        });
+        if (!socketRef.current) {
+          socketRef.current = io(import.meta.env.VITE_API_URL, {
+            withCredentials: true
+          });
+        }
 
-        socketRef.current.on('connect', () => {
-          myUserId.current = socketRef.current.id;
+        const socketInstance = socketRef.current;
+
+        // Deduplicate listeners to avoid multiple binding memory leaks/closures
+        socketInstance.off('connect');
+        socketInstance.off('peer:existing_users');
+        socketInstance.off('peer:seats_updated');
+        socketInstance.off('peer:new_user_joined');
+        socketInstance.off('peer:receive_message');
+        socketInstance.off('peer:offer');
+        socketInstance.off('peer:answer');
+        socketInstance.off('peer:ice_candidate');
+        socketInstance.off('peer:mute_updated');
+        socketInstance.off('peer:admin_stood_up');
+        socketInstance.off('peer:kicked_by_owner');
+        socketInstance.off('voice_room:error');
+        socketInstance.off('peer:user_left');
+
+        const onConnect = () => {
+          myUserId.current = socketInstance.id;
           
           // Map my own socket ID to my user details
-          socketToUserRef.current.set(socketRef.current.id, {
+          socketToUserRef.current.set(socketInstance.id, {
             userId: currentUser?._id || currentUser?.id,
             uid: currentUser?.uid,
             username: currentUser?.username,
             avatarUrl: currentUser?.avatarUrl
           });
 
-          socketRef.current.emit('peer:join_room', { 
+          socketInstance.emit('peer:join_room', { 
             roomId: id, 
             user: {
               userId: currentUser?._id || currentUser?.id,
@@ -141,9 +162,15 @@ const RoomPage = () => {
               avatarUrl: currentUser?.avatarUrl
             }
           });
-        });
+        };
 
-        socketRef.current.on('peer:existing_users', ({ users, seats: initialSeats, activeMembersCount: count }) => {
+        socketInstance.on('connect', onConnect);
+
+        if (socketInstance.connected) {
+          onConnect();
+        }
+
+        socketInstance.on('peer:existing_users', ({ users, seats: initialSeats, activeMembersCount: count }) => {
           if (count !== undefined) setActiveMembersCount(count);
           if (initialSeats) setSeats(initialSeats);
           users.forEach(({ socketId, user: userData }) => {
@@ -156,7 +183,7 @@ const RoomPage = () => {
           updateRemotePeers();
         });
 
-         socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers, owner, activeMembersCount: count }) => {
+         socketInstance.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers, owner, activeMembersCount: count }) => {
           if (count !== undefined) setActiveMembersCount(count);
           setSeats(updatedSeats);
           if (seatsUsers) {
@@ -176,7 +203,7 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:new_user_joined', ({ socketId, user: userData }) => {
+        socketInstance.on('peer:new_user_joined', ({ socketId, user: userData }) => {
           socketToUserRef.current.set(socketId, userData);
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
@@ -190,11 +217,11 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:receive_message', (msg) => {
+        socketInstance.on('peer:receive_message', (msg) => {
           setMessages(prev => [...prev, msg]);
         });
 
-        socketRef.current.on('peer:offer', ({ sdp, fromUserId }) => {
+        socketInstance.on('peer:offer', ({ sdp, fromUserId }) => {
           const peerData = peersRef.current.get(fromUserId);
           if (peerData && peerData.peer) {
             try {
@@ -205,7 +232,7 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:answer', ({ sdp, fromUserId }) => {
+        socketInstance.on('peer:answer', ({ sdp, fromUserId }) => {
           const peerData = peersRef.current.get(fromUserId);
           if (peerData && peerData.peer) {
             try {
@@ -216,7 +243,7 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:ice_candidate', ({ candidate, fromUserId }) => {
+        socketInstance.on('peer:ice_candidate', ({ candidate, fromUserId }) => {
           const peerData = peersRef.current.get(fromUserId);
           if (peerData && peerData.peer) {
             try {
@@ -227,7 +254,7 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:mute_updated', ({ socketId, isMuted, selfMuted, adminMuted }) => {
+        socketInstance.on('peer:mute_updated', ({ socketId, isMuted, selfMuted, adminMuted }) => {
           setMutedPeers(prev => {
             const next = new Set(prev);
             if (isMuted) next.add(socketId);
@@ -255,14 +282,14 @@ const RoomPage = () => {
           });
         });
 
-        socketRef.current.on('peer:admin_stood_up', () => {
+        socketInstance.on('peer:admin_stood_up', () => {
           toast.error("You have been stood up from your seat by the owner.");
           if (socketRef.current) {
             socketRef.current.emit('peer:stand_up', { roomId: id });
           }
         });
 
-        socketRef.current.on('peer:kicked_by_owner', (data) => {
+        socketInstance.on('peer:kicked_by_owner', (data) => {
           const min = data?.remainingMinutes ?? 10;
           const sec = data?.remainingSeconds ?? 0;
           toast.error(`You are kicked please rejoin again in ${min} min ${sec} sec`);
@@ -270,13 +297,13 @@ const RoomPage = () => {
           navigate('/lobby');
         });
 
-        socketRef.current.on('voice_room:error', ({ message }) => {
+        socketInstance.on('voice_room:error', ({ message }) => {
           toast.error(message);
           closeRoom();
           navigate('/lobby');
         });
 
-        socketRef.current.on('peer:user_left', ({ userId }) => {
+        socketInstance.on('peer:user_left', ({ userId }) => {
           const userData = socketToUserRef.current.get(userId);
           if (userData) {
             setMessages(prev => [...prev, {
@@ -305,12 +332,8 @@ const RoomPage = () => {
       }
     };
 
-    // Initialize WebRTC and Socket only if not already initialized
-    if (!socketRef.current) {
-      initWebRTC();
-    } else {
-      updateRemotePeers();
-    }
+    // Always run initWebRTC on mount to re-bind listeners and update remote peers correctly
+    initWebRTC();
 
     // Set minimized to false on mount/expansion
     setIsMinimized(false);
