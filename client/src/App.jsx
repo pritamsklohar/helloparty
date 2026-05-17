@@ -51,10 +51,13 @@ const AppContent = () => {
     }
   }, [location]);
   
+  // Check auth on mount
   useEffect(() => {
     checkAuth();
-    
-    // Restore active room session on page refresh/mount
+  }, [checkAuth]);
+  
+  // Restore active room session exactly once on initial page mount/refresh
+  useEffect(() => {
     const activeRoomId = localStorage.getItem('activeRoomId');
     if (activeRoomId) {
       localStorage.setItem('inRoom', 'true');
@@ -62,7 +65,7 @@ const AppContent = () => {
     } else {
       localStorage.setItem('inRoom', 'false');
     }
-  }, [checkAuth, navigate]);
+  }, []);
 
   // Global Socket Connection & Background Sync
   useEffect(() => {
