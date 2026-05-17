@@ -8,8 +8,8 @@ const router = express.Router();
 const upload = require('../middleware/upload');
 
 const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ id: userId }, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  const accessToken = jwt.sign({ id: userId }, process.env.JWT_ACCESS_SECRET, { expiresIn: '365d' });
+  const refreshToken = jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: '365d' });
   return { accessToken, refreshToken };
 };
 
@@ -46,7 +46,7 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge: 365 * 24 * 60 * 60 * 1000
     });
 
     res.status(201).json({
@@ -75,7 +75,7 @@ router.post('/login', async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge: 365 * 24 * 60 * 60 * 1000
     });
 
     res.json({
@@ -117,7 +117,7 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
-    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
+    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_ACCESS_SECRET, { expiresIn: '365d' });
     res.json({ accessToken: newAccessToken });
   } catch (error) {
     res.status(401).json({ message: 'Invalid refresh token' });
