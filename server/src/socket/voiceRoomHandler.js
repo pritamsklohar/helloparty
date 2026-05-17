@@ -3,6 +3,7 @@ const User = require('../models/User');
 
 // In-memory unified state: roomId -> RoomObject
 const voiceRooms = new Map();
+const ownerDisconnectTimeouts = new Map(); // roomId -> TimeoutObject
 
 const updateActiveMembersCount = (room) => {
   let count = room.owner ? 1 : 0;
@@ -93,6 +94,16 @@ const voiceRoomHandler = (io, socket) => {
       if (room.owner && room.owner.handle === user.username) {
         existingUser = room.owner;
         existingUser.id = socket.id; // update socket.id
+        
+        // If owner reconnected, clear any pending timeouts!
+        if (existingUser.disconnected) {
+          existingUser.disconnected = false;
+          if (ownerDisconnectTimeouts.has(roomId)) {
+            clearTimeout(ownerDisconnectTimeouts.get(roomId));
+            ownerDisconnectTimeouts.delete(roomId);
+            addRoomLog(room, `Owner ${existingUser.name} reconnected. Reconnection timeout cleared.`);
+          }
+        }
       } else {
         for (let i = 0; i < 8; i++) {
           if (room.seats[i] && room.seats[i].handle === user.username) {
@@ -493,7 +504,7 @@ const voiceRoomHandler = (io, socket) => {
   });
 
   // 5. Clean exit or sudden disconnect
-  const exitUser = (roomId, socketId) => {
+  const exitUser = (roomId, socketId, isSuddenDisconnect = false) => {
     const room = voiceRooms.get(roomId);
     if (!room) return;
 
@@ -502,47 +513,139 @@ const voiceRoomHandler = (io, socket) => {
 
     // Check if owner disconnected
     if (room.owner && room.owner.id === socketId) {
-      exitedUser = room.owner;
-      room.owner = null;
+      if (isSuddenDisconnect) {
+        // Mark owner as disconnected
+        room.owner.disconnected = true;
+        room.owner.disconnectedAt = Date.now();
+        addRoomLog(room, `Owner ${room.owner.name} disconnected. Waiting 2 minutes for reconnection.`);
 
-      // Promotion Priority:
-      // 1st -> Seated user (lowest occupied seat 1-8)
-      let newOwnerCandidate = null;
-      let promotedFrom = null;
-      let originalSeatNum = null;
-
-      for (let i = 0; i < 8; i++) {
-        if (room.seats[i] !== null) {
-          newOwnerCandidate = room.seats[i];
-          promotedFrom = 'seat';
-          originalSeatNum = i + 1;
-          room.seats[i] = null;
-          break;
+        // Clear any existing timeout for this room
+        if (ownerDisconnectTimeouts.has(roomId)) {
+          clearTimeout(ownerDisconnectTimeouts.get(roomId));
         }
-      }
 
-      // 2nd -> First in waiting list
-      if (!newOwnerCandidate && room.waitingList.length > 0) {
-        newOwnerCandidate = room.waitingList[0];
-        promotedFrom = 'waitingList';
-        room.waitingList.splice(0, 1);
-      }
+        const timeout = setTimeout(async () => {
+          ownerDisconnectTimeouts.delete(roomId);
+          const currentRoom = voiceRooms.get(roomId);
+          if (!currentRoom || !currentRoom.owner || !currentRoom.owner.disconnected) return;
 
-      if (newOwnerCandidate) {
-        newOwnerCandidate.role = 'owner';
-        newOwnerCandidate.status = 'seated';
-        newOwnerCandidate.seat = 0;
-        room.owner = newOwnerCandidate;
+          // Timeout fired and owner is still disconnected! Promote or close!
+          const oldOwnerName = currentRoom.owner.name;
+          currentRoom.owner = null;
 
-        if (promotedFrom === 'seat') {
-          addRoomLog(room, `${oldOwnerName} left. ${newOwnerCandidate.name} promoted from seat ${originalSeatNum} to owner.`);
-        } else {
-          addRoomLog(room, `${oldOwnerName} left. ${newOwnerCandidate.name} promoted from waiting list to owner.`);
-        }
+          let newOwnerCandidate = null;
+          let promotedFrom = null;
+          let originalSeatNum = null;
+
+          for (let i = 0; i < 8; i++) {
+            if (currentRoom.seats[i] !== null) {
+              newOwnerCandidate = currentRoom.seats[i];
+              promotedFrom = 'seat';
+              originalSeatNum = i + 1;
+              currentRoom.seats[i] = null;
+              break;
+            }
+          }
+
+          if (!newOwnerCandidate && currentRoom.waitingList.length > 0) {
+            newOwnerCandidate = currentRoom.waitingList[0];
+            promotedFrom = 'waitingList';
+            currentRoom.waitingList.splice(0, 1);
+          }
+
+          if (newOwnerCandidate) {
+            newOwnerCandidate.role = 'owner';
+            newOwnerCandidate.status = 'seated';
+            newOwnerCandidate.seat = 0;
+            currentRoom.owner = newOwnerCandidate;
+
+            if (promotedFrom === 'seat') {
+              addRoomLog(currentRoom, `${oldOwnerName} left permanently. ${newOwnerCandidate.name} promoted from seat ${originalSeatNum} to owner.`);
+            } else {
+              addRoomLog(currentRoom, `${oldOwnerName} left permanently. ${newOwnerCandidate.name} promoted from waiting list to owner.`);
+            }
+            
+            // Broadcast seats updated
+            broadcastSeatsUpdated(io, roomId, currentRoom);
+          } else {
+            // Close Room and remove from database!
+            addRoomLog(currentRoom, `Owner left permanently. No members remaining — room closed.`);
+            voiceRooms.delete(roomId);
+            try {
+              await Room.findByIdAndDelete(roomId);
+              console.log(`Deleted empty room ${roomId} from DB after owner 2m timeout`);
+            } catch (err) {
+              console.error("Failed to delete room from DB after timeout:", err.message);
+            }
+          }
+
+          updateActiveMembersCount(currentRoom);
+          io.in(roomId).emit('peer:seats_updated', {
+            seats: currentRoom.seats.map(u => u ? u.id : null),
+            seatsUsers: currentRoom.seats.filter(u => u !== null).map(u => ({
+              socketId: u.id,
+              user: {
+                userId: u.userId,
+                uid: u.uid,
+                username: u.name,
+                avatarUrl: u.avatar
+              }
+            }))
+          });
+          io.in(roomId).emit('peer:user_left', { userId: socketId });
+
+        }, 120000); // 2 minutes (120000ms)
+
+        ownerDisconnectTimeouts.set(roomId, timeout);
+        return; // Don't run the standard immediate exit logic!
       } else {
-        // Close Room
-        addRoomLog(room, `Owner left. No members remaining — room closed.`);
-        voiceRooms.delete(roomId);
+        // Explicit clean exit: immediately exit and remove from DB if empty!
+        exitedUser = room.owner;
+        room.owner = null;
+
+        // Promoted priority
+        let newOwnerCandidate = null;
+        let promotedFrom = null;
+        let originalSeatNum = null;
+
+        for (let i = 0; i < 8; i++) {
+          if (room.seats[i] !== null) {
+            newOwnerCandidate = room.seats[i];
+            promotedFrom = 'seat';
+            originalSeatNum = i + 1;
+            room.seats[i] = null;
+            break;
+          }
+        }
+
+        if (!newOwnerCandidate && room.waitingList.length > 0) {
+          newOwnerCandidate = room.waitingList[0];
+          promotedFrom = 'waitingList';
+          room.waitingList.splice(0, 1);
+        }
+
+        if (newOwnerCandidate) {
+          newOwnerCandidate.role = 'owner';
+          newOwnerCandidate.status = 'seated';
+          newOwnerCandidate.seat = 0;
+          room.owner = newOwnerCandidate;
+
+          if (promotedFrom === 'seat') {
+            addRoomLog(room, `${oldOwnerName} left. ${newOwnerCandidate.name} promoted from seat ${originalSeatNum} to owner.`);
+          } else {
+            addRoomLog(room, `${oldOwnerName} left. ${newOwnerCandidate.name} promoted from waiting list to owner.`);
+          }
+        } else {
+          // Close Room and delete from DB!
+          addRoomLog(room, `Owner left. No members remaining — room closed.`);
+          voiceRooms.delete(roomId);
+          try {
+            await Room.findByIdAndDelete(roomId);
+            console.log(`Deleted empty room ${roomId} from DB immediately after owner left`);
+          } catch (err) {
+            console.error("Failed to delete room from DB immediately:", err.message);
+          }
+        }
       }
     } else {
       // Check seated users
@@ -579,7 +682,7 @@ const voiceRoomHandler = (io, socket) => {
 
   socket.on('peer:leave_room', ({ roomId }) => {
     try {
-      exitUser(roomId, socket.id);
+      exitUser(roomId, socket.id, false); // isSuddenDisconnect = false
       socket.leave(roomId);
       socket.voiceRoomId = null;
       socket.voiceUserHandle = null;
@@ -592,7 +695,7 @@ const voiceRoomHandler = (io, socket) => {
     try {
       Array.from(socket.rooms).forEach(roomId => {
         if (roomId !== socket.id) {
-          exitUser(roomId, socket.id);
+          exitUser(roomId, socket.id, true); // isSuddenDisconnect = true
         }
       });
     } catch (err) {

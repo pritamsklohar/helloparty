@@ -1,10 +1,11 @@
 const Message = require('../models/Message');
+const User = require('../models/User');
 
 const onlineUsers = new Map(); // userId -> socketId
 
 const chatHandler = (io, socket) => {
   // Join personal room based on user ID
-  socket.on('join_personal', (userId) => {
+  socket.on('join_personal', async (userId) => {
     if (!userId || userId === 'null' || userId === 'undefined') {
       console.warn(`Socket ${socket.id} tried to join as null user`);
       return;
@@ -13,6 +14,13 @@ const chatHandler = (io, socket) => {
     socket.join(`user_${userId}`);
     socket.userId = userId;
     onlineUsers.set(userId, socket.id);
+    
+    // Set isOnline in Mongo
+    try {
+      await User.findByIdAndUpdate(userId, { isOnline: true });
+    } catch (err) {
+      console.error(`Error marking user ${userId} online:`, err.message);
+    }
     
     // Broadcast that this user is online to everyone
     io.emit('user_status_change', { userId, status: 'online' });
@@ -151,9 +159,17 @@ const chatHandler = (io, socket) => {
   });
 
   // Handle disconnection
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     if (socket.userId) {
       onlineUsers.delete(socket.userId);
+      
+      // Set isOnline to false in Mongo
+      try {
+        await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
+      } catch (err) {
+        console.error(`Error marking user ${socket.userId} offline:`, err.message);
+      }
+
       io.emit('user_status_change', { userId: socket.userId, status: 'offline' });
       console.log(`User ${socket.userId} went offline`);
     }
