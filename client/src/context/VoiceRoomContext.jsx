@@ -34,6 +34,7 @@ export const VoiceRoomProvider = ({ children }) => {
     setIsMinimized(false);
     localStorage.setItem('inRoom', 'true');
     localStorage.setItem('activeRoomId', roomDataVal._id);
+    localStorage.setItem('roomMinimized', 'false');
   };
 
   const minimizeRoom = () => {
@@ -96,6 +97,7 @@ export const VoiceRoomProvider = ({ children }) => {
     setAdminMutedPeers(new Set());
     localStorage.setItem('inRoom', 'false');
     localStorage.removeItem('activeRoomId');
+    localStorage.removeItem('roomMinimized');
   };
 
   return (

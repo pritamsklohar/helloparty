@@ -44,6 +44,13 @@ const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Track last visited non-room page
+  useEffect(() => {
+    if (!location.pathname.startsWith('/room/')) {
+      localStorage.setItem('lastPath', location.pathname);
+    }
+  }, [location]);
+  
   useEffect(() => {
     checkAuth();
     

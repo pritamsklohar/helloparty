@@ -16,6 +16,7 @@ const MinimizedRoom = () => {
   }
 
   const handleRestore = () => {
+    localStorage.setItem('roomMinimized', 'false');
     navigate(`/room/${activeRoom._id}`);
   };
 

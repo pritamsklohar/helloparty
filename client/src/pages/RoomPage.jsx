@@ -69,6 +69,18 @@ const RoomPage = () => {
     setRemotePeers(Array.from(peersRef.current.keys()));
   };
 
+  // Automatically redirect back to lobby/lastPath if room was minimized on reload
+  useEffect(() => {
+    const shouldMinimize = localStorage.getItem('roomMinimized') === 'true';
+    if (shouldMinimize) {
+      const lastPath = localStorage.getItem('lastPath') || '/lobby';
+      const timer = setTimeout(() => {
+        navigate(lastPath);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [navigate]);
+
   useEffect(() => {
     if (isBannedLocally) return;
 
@@ -471,7 +483,13 @@ const RoomPage = () => {
         {/* Left Side Group */}
         <div className="flex items-center gap-1">
           {/* Back Button */}
-          <button onClick={() => navigate('/lobby')} className="text-white hover:text-white/80 transition-colors mr-0.5">
+          <button 
+            onClick={() => {
+              localStorage.setItem('roomMinimized', 'true');
+              navigate('/lobby');
+            }} 
+            className="text-white hover:text-white/80 transition-colors mr-0.5"
+          >
             <FiChevronLeft className="text-2xl" />
           </button>
           
