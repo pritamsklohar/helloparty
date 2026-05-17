@@ -49,12 +49,28 @@ const RoomPage = () => {
   const ownerId = roomData?.host?.id || roomData?.host?._id;
   const isOwner = (uid) => uid === ownerId;
 
+  // Instant check for local ban
+  const bannedUntil = localStorage.getItem(`banned_room_${id}`);
+  const isBannedLocally = bannedUntil && parseInt(bannedUntil) > Date.now();
+
+  useEffect(() => {
+    if (isBannedLocally) {
+      const remainingMs = parseInt(bannedUntil) - Date.now();
+      const min = Math.floor(remainingMs / 60000);
+      const sec = Math.ceil((remainingMs % 60000) / 1000);
+      toast.error(`You are banned from this room for ${min} min ${sec} sec`);
+      navigate('/lobby', { replace: true });
+    }
+  }, [isBannedLocally, bannedUntil, navigate]);
+
   // Helper to update UI list
   const updateRemotePeers = () => {
     setRemotePeers(Array.from(peersRef.current.keys()));
   };
 
   useEffect(() => {
+    if (isBannedLocally) return;
+
     // 1. Get Room Data
     const fetchRoom = async () => {
       try {
@@ -423,6 +439,10 @@ const RoomPage = () => {
     }
     setMessage('');
   };
+
+  if (isBannedLocally) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-bg overflow-hidden relative">

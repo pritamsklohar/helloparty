@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useRef } from 'react';
 import api from '../services/api';
+import useAuthStore from '../store/authStore';
 
 const VoiceRoomContext = createContext();
 
@@ -45,7 +46,11 @@ export const VoiceRoomProvider = ({ children }) => {
     const roomId = activeRoom?._id || roomData?._id;
     
     // 1. If host is leaving and closing
-    if (activeRoom) {
+    const currentUser = useAuthStore.getState().user;
+    const hostId = activeRoom?.host?._id || activeRoom?.host;
+    const isHost = hostId && (hostId === currentUser?._id || hostId === currentUser?.id);
+    
+    if (activeRoom && isHost) {
       try {
         await api.delete(`/rooms/${activeRoom._id}`);
       } catch (error) {
