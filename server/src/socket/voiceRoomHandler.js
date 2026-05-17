@@ -118,17 +118,9 @@ const voiceRoomHandler = (io, socket) => {
           room.owner = newUser;
           addRoomLog(room, `${user.username} created/entered the room as owner.`);
         } else {
-          // Put in lowest empty seat index (0-7)
-          const emptyIdx = room.seats.indexOf(null);
-          if (emptyIdx !== -1) {
-            newUser.status = 'seated';
-            newUser.seat = emptyIdx + 1;
-            room.seats[emptyIdx] = newUser;
-            addRoomLog(room, `${user.username} entered and took seat ${emptyIdx + 1}.`);
-          } else {
-            room.waitingList.push(newUser);
-            addRoomLog(room, `${user.username} entered the room and joined the waiting list.`);
-          }
+          // ALWAYS place non-owners on the waiting list upon room entry
+          room.waitingList.push(newUser);
+          addRoomLog(room, `${user.username} entered the room and joined the waiting list.`);
         }
         updateActiveMembersCount(room);
       }
