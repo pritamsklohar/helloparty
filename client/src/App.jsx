@@ -45,6 +45,8 @@ const AppContent = () => {
   
   useEffect(() => {
     checkAuth();
+    // Reset inRoom local storage on initial mount/refresh to keep it always in sync
+    localStorage.setItem('inRoom', 'false');
   }, [checkAuth]);
 
   // Global Socket Connection & Background Sync

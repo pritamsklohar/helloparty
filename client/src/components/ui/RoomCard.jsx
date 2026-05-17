@@ -1,8 +1,20 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUsers, FiLock } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const RoomCard = ({ room }) => {
+  const navigate = useNavigate();
+
+  const handleJoin = (e) => {
+    e.preventDefault();
+    if (localStorage.getItem('inRoom') === 'true') {
+      toast.error("Already in Room");
+      return;
+    }
+    navigate(`/room/${room.id}`);
+  };
+
   const getGameBadgeColor = (type) => {
     switch(type) {
       case 'VOICE': return 'bg-primary/20 text-primary border-primary/30';
@@ -23,9 +35,9 @@ const RoomCard = ({ room }) => {
       whileHover={{ y: -5, scale: 1.02 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
-      <Link 
-        to={`/room/${room.id}`}
-        className="block bg-surface/60 backdrop-blur-sm border border-border hover:border-primary/50 rounded-2xl p-5 relative overflow-hidden group shadow-lg hover:shadow-primary/20 transition-all h-full"
+      <div 
+        onClick={handleJoin}
+        className="block cursor-pointer bg-surface/60 backdrop-blur-sm border border-border hover:border-primary/50 rounded-2xl p-5 relative overflow-hidden group shadow-lg hover:shadow-primary/20 transition-all h-full"
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-accent opacity-0 group-hover:opacity-100 transition-opacity"></div>
         
@@ -68,7 +80,7 @@ const RoomCard = ({ room }) => {
             </div>
           </div>
         </div>
-      </Link>
+      </div>
     </motion.div>
   );
 };

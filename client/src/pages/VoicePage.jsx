@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiSearch, FiPlus, FiX, FiLock, FiUnlock, FiVideo, FiMic } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 
 const VoicePage = () => {
   const navigate = useNavigate();
@@ -41,6 +42,11 @@ const VoicePage = () => {
   const handleCreateRoom = async (e) => {
     e.preventDefault();
     if (!roomName.trim()) return;
+
+    if (localStorage.getItem('inRoom') === 'true') {
+      toast.error("Already in Room");
+      return;
+    }
     
     setIsLoading(true);
     try {
@@ -95,7 +101,13 @@ const VoicePage = () => {
                 key={room._id}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate(`/room/${room._id}`)}
+                onClick={() => {
+                  if (localStorage.getItem('inRoom') === 'true') {
+                    toast.error("Already in Room");
+                    return;
+                  }
+                  navigate(`/room/${room._id}`);
+                }}
                 className="bg-surfaceAlt/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 cursor-pointer hover:bg-surfaceAlt/60 transition-all group relative overflow-hidden"
               >
                 {/* Background Decor */}
