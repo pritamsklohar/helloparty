@@ -200,6 +200,11 @@ const voiceRoomHandler = (io, socket) => {
       const room = voiceRooms.get(roomId);
       if (!room) return;
 
+      // Disallow room owner/host from taking user seats 1-8!
+      if (room.owner && room.owner.id === socket.id) {
+        return;
+      }
+
       // If already sitting somewhere, clear that first
       for (let i = 0; i < 8; i++) {
         if (room.seats[i] && room.seats[i].id === socket.id) {

@@ -285,6 +285,9 @@ const RoomPage = () => {
     } else if (occupantId) {
       setSeatModal({ type: 'PROFILE', seatIndex: index, userId: occupantId });
     } else {
+      // Owners/hosts occupy the Owner seat 0 and cannot take user seats 1-8!
+      if (isHostMe) return;
+
       if (amISitting) {
         setSeatModal({ type: 'CONFIRM_CHANGE', seatIndex: index });
       } else {
