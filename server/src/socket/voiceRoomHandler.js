@@ -302,6 +302,167 @@ const voiceRoomHandler = (io, socket) => {
     }
   });
 
+  // 4a. Mute state handler
+  socket.on('peer:mute_state', ({ roomId, isMuted }) => {
+    try {
+      const room = voiceRooms.get(roomId);
+      if (!room) return;
+
+      // Find user
+      let userObj = null;
+      if (room.owner && room.owner.id === socket.id) {
+        userObj = room.owner;
+      } else {
+        for (let i = 0; i < 8; i++) {
+          if (room.seats[i] && room.seats[i].id === socket.id) {
+            userObj = room.seats[i];
+            break;
+          }
+        }
+      }
+      if (!userObj) {
+        userObj = room.waitingList.find(u => u.id === socket.id);
+      }
+
+      if (userObj) {
+        userObj.selfMuted = isMuted;
+      }
+
+      const isOverallMuted = userObj ? (userObj.selfMuted || !!userObj.adminMuted) : isMuted;
+      const isAdminMuted = userObj ? !!userObj.adminMuted : false;
+
+      io.in(roomId).emit('peer:mute_updated', {
+        socketId: socket.id,
+        isMuted: isOverallMuted,
+        selfMuted: userObj ? userObj.selfMuted : isMuted,
+        adminMuted: isAdminMuted
+      });
+    } catch (err) {
+      console.error("Error in peer:mute_state:", err.message);
+    }
+  });
+
+  // 4b. Admin Lift Up handler (Stand up user from seat to waiting list)
+  socket.on('peer:admin_lift_up', ({ roomId, targetSocketId }) => {
+    try {
+      const room = voiceRooms.get(roomId);
+      if (!room) return;
+
+      // Validate owner
+      if (!room.owner || room.owner.id !== socket.id) return;
+
+      let targetUser = null;
+      for (let i = 0; i < 8; i++) {
+        if (room.seats[i] && room.seats[i].id === targetSocketId) {
+          targetUser = room.seats[i];
+          room.seats[i] = null;
+          break;
+        }
+      }
+
+      if (targetUser) {
+        targetUser.status = 'waiting';
+        targetUser.seat = null;
+        room.waitingList.push(targetUser);
+
+        addRoomLog(room, `${room.owner.name} stood up ${targetUser.name} from seat.`);
+        updateActiveMembersCount(room);
+
+        // Broadcast updated seats in real-time
+        io.in(roomId).emit('peer:seats_updated', {
+          seats: room.seats.map(u => u ? u.id : null)
+        });
+
+        // Notify target client to stand up
+        const targetSocket = io.sockets.sockets.get(targetSocketId);
+        if (targetSocket) {
+          targetSocket.emit('peer:admin_stood_up');
+        }
+      }
+    } catch (err) {
+      console.error("Error in peer:admin_lift_up:", err.message);
+    }
+  });
+
+  // 4c. Admin Kick handler (Kick user and ban for 10 minutes)
+  socket.on('peer:admin_kick', ({ roomId, targetSocketId }) => {
+    try {
+      const room = voiceRooms.get(roomId);
+      if (!room) return;
+
+      // Validate owner
+      if (!room.owner || room.owner.id !== socket.id) return;
+
+      let targetUser = null;
+      for (let i = 0; i < 8; i++) {
+        if (room.seats[i] && room.seats[i].id === targetSocketId) {
+          targetUser = room.seats[i];
+          break;
+        }
+      }
+      if (!targetUser) {
+        targetUser = room.waitingList.find(u => u.id === targetSocketId);
+      }
+
+      if (targetUser) {
+        // Kick & ban for 10 minutes (600,000 milliseconds)
+        room.kickBans[targetUser.handle] = Date.now() + 10 * 60 * 1000;
+
+        addRoomLog(room, `${room.owner.name} kicked ${targetUser.name} from room.`);
+        
+        // Remove user
+        exitUser(roomId, targetSocketId);
+
+        // Notify target client
+        const targetSocket = io.sockets.sockets.get(targetSocketId);
+        if (targetSocket) {
+          targetSocket.emit('peer:kicked_by_owner');
+          targetSocket.leave(roomId);
+        }
+      }
+    } catch (err) {
+      console.error("Error in peer:admin_kick:", err.message);
+    }
+  });
+
+  // 4d. Admin Mute Toggle handler
+  socket.on('peer:admin_mute_toggle', ({ roomId, targetSocketId }) => {
+    try {
+      const room = voiceRooms.get(roomId);
+      if (!room) return;
+
+      // Validate owner
+      if (!room.owner || room.owner.id !== socket.id) return;
+
+      let targetUser = null;
+      for (let i = 0; i < 8; i++) {
+        if (room.seats[i] && room.seats[i].id === targetSocketId) {
+          targetUser = room.seats[i];
+          break;
+        }
+      }
+      if (!targetUser) {
+        targetUser = room.waitingList.find(u => u.id === targetSocketId);
+      }
+
+      if (targetUser) {
+        targetUser.adminMuted = !targetUser.adminMuted;
+        
+        const isOverallMuted = targetUser.selfMuted || targetUser.adminMuted;
+        io.in(roomId).emit('peer:mute_updated', {
+          socketId: targetSocketId,
+          isMuted: isOverallMuted,
+          selfMuted: targetUser.selfMuted,
+          adminMuted: targetUser.adminMuted
+        });
+
+        addRoomLog(room, `${room.owner.name} ${targetUser.adminMuted ? 'muted' : 'unmuted'} ${targetUser.name}.`);
+      }
+    } catch (err) {
+      console.error("Error in peer:admin_mute_toggle:", err.message);
+    }
+  });
+
   // 5. Clean exit or sudden disconnect
   const exitUser = (roomId, socketId) => {
     const room = voiceRooms.get(roomId);

@@ -26,6 +26,7 @@ const RoomPage = () => {
     activeSpeakerId, setActiveSpeakerId,
     speakingPeers, setSpeakingPeers,
     mutedPeers, setMutedPeers,
+    adminMutedPeers, setAdminMutedPeers,
     socketRef,
     localStreamRef,
     peersRef,
@@ -170,13 +171,45 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:mute_updated', ({ socketId, isMuted }) => {
+        socketRef.current.on('peer:mute_updated', ({ socketId, isMuted, selfMuted, adminMuted }) => {
           setMutedPeers(prev => {
             const next = new Set(prev);
             if (isMuted) next.add(socketId);
             else next.delete(socketId);
             return next;
           });
+          setAdminMutedPeers(prev => {
+            const next = new Set(prev);
+            if (adminMuted) {
+              next.add(socketId);
+              if (socketId === myUserId.current && localStreamRef.current) {
+                const audioTrack = localStreamRef.current.getAudioTracks()[0];
+                if (audioTrack) {
+                  audioTrack.enabled = false;
+                  setIsMuted(true);
+                  if (activeSpeakerId === myUserId.current) {
+                    setActiveSpeakerId(null);
+                  }
+                }
+              }
+            } else {
+              next.delete(socketId);
+            }
+            return next;
+          });
+        });
+
+        socketRef.current.on('peer:admin_stood_up', () => {
+          toast.error("You have been stood up from your seat by the owner.");
+          if (socketRef.current) {
+            socketRef.current.emit('peer:stand_up', { roomId: id });
+          }
+        });
+
+        socketRef.current.on('peer:kicked_by_owner', () => {
+          toast.error("You have been kicked from the room by the owner.");
+          closeRoom();
+          navigate('/lobby');
         });
 
         socketRef.current.on('peer:user_left', ({ userId }) => {
@@ -260,6 +293,10 @@ const RoomPage = () => {
   };
 
   const toggleMute = () => {
+    if (adminMutedPeers.has(myUserId.current)) {
+      toast.error("You have been muted by the owner.");
+      return;
+    }
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
@@ -466,10 +503,16 @@ const RoomPage = () => {
         
         {/* Host Area (Top Center) */}
         <div className="flex flex-col items-center justify-center mt-2 mb-8">
-          <div className={`w-20 h-20 rounded-full border-2 p-0.5 relative transition-all duration-300
-            ${isOwner(roomData?.host?.id || roomData?.host?._id) ? 'border-[#8e44ad]' : 'border-[#2ecc71]'}
-            ${activeSpeakerId === hostSocketId ? 'animate-pulse-glow scale-110' : ''}
-          `}>
+          <div 
+            onClick={() => {
+              if (hostSocketId) {
+                setSeatModal({ type: 'PROFILE', seatIndex: -1, userId: hostSocketId });
+              }
+            }}
+            className={`w-20 h-20 rounded-full border-2 p-0.5 relative transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95 shadow-2xl
+              ${isOwner(roomData?.host?.id || roomData?.host?._id) ? 'border-[#8e44ad]' : 'border-[#2ecc71]'}
+              ${activeSpeakerId === hostSocketId ? 'animate-pulse-glow scale-110' : ''}
+            `}>
             {/* Rippling Rings when host is talking */}
             {activeSpeakerId === hostSocketId && (
               <>
@@ -579,6 +622,11 @@ const RoomPage = () => {
                       {userIsOwner && !isMe && (
                         <div className="absolute -top-1 -right-1 bg-[#8e44ad] text-[6px] px-1 rounded-full text-white font-bold">OWNER</div>
                       )}
+                      {userId && adminMutedPeers.has(userId) && (
+                        <div className="absolute -bottom-1 -right-1 bg-red-500 text-white rounded-full p-1 border border-bg z-20 flex items-center justify-center w-5 h-5 shadow-lg shadow-red-500/30">
+                          <FiMicOff className="text-[10px]" />
+                        </div>
+                      )}
                     </>
                   ) : (
                     <FiPlus className="text-white/30 text-xl" />
@@ -651,10 +699,57 @@ const RoomPage = () => {
                           </button>
                           <button 
                             onClick={() => setSeatModal(null)}
-                            className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors"
+                            className="col-span-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors"
                           >
                             <FiX className="text-red-400" /> Close
                           </button>
+
+                          {isHostMe && seatModal.userId !== myUserId.current && (
+                            <>
+                              <button 
+                                onClick={() => {
+                                  setSeatModal(null);
+                                  if (socketRef.current) {
+                                    socketRef.current.emit('peer:admin_mute_toggle', { roomId: id, targetSocketId: seatModal.userId });
+                                  }
+                                }}
+                                className={`col-span-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold transition-all active:scale-95 border
+                                  ${adminMutedPeers.has(seatModal.userId)
+                                    ? 'bg-green-600/20 hover:bg-green-600/30 border-green-500/30 text-green-400' 
+                                    : 'bg-orange-600/20 hover:bg-orange-600/30 border-orange-500/30 text-orange-400'
+                                  }
+                                `}
+                              >
+                                <FiMicOff /> {adminMutedPeers.has(seatModal.userId) ? 'Unmute' : 'Mute'}
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  if (window.confirm("Are you sure you want to kick this user? They will be banned for 10 minutes.")) {
+                                    setSeatModal(null);
+                                    if (socketRef.current) {
+                                      socketRef.current.emit('peer:admin_kick', { roomId: id, targetSocketId: seatModal.userId });
+                                    }
+                                  }
+                                }}
+                                className="col-span-1 flex items-center justify-center gap-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 py-3 rounded-2xl text-sm font-bold text-red-400 transition-all active:scale-95"
+                              >
+                                <FiAlertTriangle /> Kick
+                              </button>
+                              {seatModal.seatIndex !== -1 && (
+                                <button 
+                                  onClick={() => {
+                                    setSeatModal(null);
+                                    if (socketRef.current) {
+                                      socketRef.current.emit('peer:admin_lift_up', { roomId: id, targetSocketId: seatModal.userId });
+                                    }
+                                  }}
+                                  className="col-span-2 flex items-center justify-center gap-2 bg-yellow-600/20 hover:bg-yellow-600/30 border border-yellow-500/30 py-3 rounded-2xl text-sm font-bold text-yellow-400 transition-all active:scale-95"
+                                >
+                                  <FiLogOut /> Lift Up (Stand Up)
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     );

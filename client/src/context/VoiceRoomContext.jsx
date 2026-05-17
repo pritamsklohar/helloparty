@@ -17,6 +17,7 @@ export const VoiceRoomProvider = ({ children }) => {
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [speakingPeers, setSpeakingPeers] = useState({});
   const [mutedPeers, setMutedPeers] = useState(new Set());
+  const [adminMutedPeers, setAdminMutedPeers] = useState(new Set());
 
   // Global Session Refs
   const socketRef = useRef(null);
@@ -89,6 +90,7 @@ export const VoiceRoomProvider = ({ children }) => {
     setActiveSpeakerId(null);
     setSpeakingPeers({});
     setMutedPeers(new Set());
+    setAdminMutedPeers(new Set());
   };
 
   return (
@@ -104,6 +106,7 @@ export const VoiceRoomProvider = ({ children }) => {
       activeSpeakerId, setActiveSpeakerId,
       speakingPeers, setSpeakingPeers,
       mutedPeers, setMutedPeers,
+      adminMutedPeers, setAdminMutedPeers,
       socketRef,
       localStreamRef,
       peersRef,
