@@ -71,7 +71,34 @@ const useChatStore = create((set, get) => ({
     try {
       const res = await api.get('/users/chat/conversations');
       const conversations = res.data.conversations;
-      set({ conversations, loadingConversations: false });
+      
+      set((state) => {
+        const newUsers = { ...state.usersCache };
+        const newGroups = { ...state.groupsCache };
+        
+        conversations.forEach((conv) => {
+          if (conv.isGroup) {
+            newGroups[conv._id] = conv;
+          } else if (conv.uid) {
+            // Prepopulate user cache with existing conversation details to make transitions 0ms!
+            const userProfile = {
+              _id: conv._id,
+              uid: conv.uid,
+              username: conv.username,
+              avatarUrl: conv.avatarUrl
+            };
+            newUsers[conv.uid] = userProfile;
+            newUsers[conv._id] = userProfile;
+          }
+        });
+        
+        return {
+          conversations,
+          usersCache: newUsers,
+          groupsCache: newGroups,
+          loadingConversations: false
+        };
+      });
     } catch (err) {
       console.error('Error fetching conversations:', err);
       set({ loadingConversations: false });

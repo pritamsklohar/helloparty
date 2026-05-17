@@ -48,49 +48,59 @@ const ChatRoomPage = () => {
 
   useEffect(() => {
     if (user) {
-      socket.emit('check_online_status', user._id);
+      const handleStatusChange = (data) => {
+        if (data.userId === user._id) {
+          setIsOnline(data.status === 'online');
+        }
+      };
+
+      const handleStatusRes = (data) => {
+        if (data.userId === user._id) {
+          setIsOnline(data.isOnline);
+        }
+      };
+
+      const handleTypingStatus = (data) => {
+        if (data.userId === user._id) {
+          setIsOtherTyping(data.isTyping);
+        }
+      };
+
+      const handleMessagesSeen = (data) => {
+        if (data.seenBy === user._id) {
+          // Mark all cached messages in this conversation as read
+          const userMessages = useChatStore.getState().messagesCache[user._id] || [];
+          const updated = userMessages.map(m => ({ ...m, isRead: true }));
+          useChatStore.setState(state => ({
+            messagesCache: { ...state.messagesCache, [user._id]: updated }
+          }));
+        }
+      };
+
+      socket.on('user_status_change', handleStatusChange);
+      socket.on('user_status_res', handleStatusRes);
+      socket.on('user_typing_status', handleTypingStatus);
+      socket.on('messages_seen', handleMessagesSeen);
+
+      const checkStatus = () => {
+        socket.emit('check_online_status', user._id);
+      };
+
+      // Emit check immediately if connected, otherwise wait for connection
+      if (socket.connected) {
+        checkStatus();
+      } else {
+        socket.on('connect', checkStatus);
+      }
+
+      return () => {
+        socket.off('user_status_change', handleStatusChange);
+        socket.off('user_status_res', handleStatusRes);
+        socket.off('user_typing_status', handleTypingStatus);
+        socket.off('messages_seen', handleMessagesSeen);
+        socket.off('connect', checkStatus);
+      };
     }
-
-    const handleStatusChange = (data) => {
-      if (data.userId === user?._id) {
-        setIsOnline(data.status === 'online');
-      }
-    };
-
-    const handleStatusRes = (data) => {
-      if (data.userId === user?._id) {
-        setIsOnline(data.isOnline);
-      }
-    };
-
-    const handleTypingStatus = (data) => {
-      if (data.userId === user?._id) {
-        setIsOtherTyping(data.isTyping);
-      }
-    };
-
-    const handleMessagesSeen = (data) => {
-      if (data.seenBy === user?._id) {
-        // Mark all cached messages in this conversation as read
-        const userMessages = useChatStore.getState().messagesCache[user._id] || [];
-        const updated = userMessages.map(m => ({ ...m, isRead: true }));
-        useChatStore.setState(state => ({
-          messagesCache: { ...state.messagesCache, [user._id]: updated }
-        }));
-      }
-    };
-
-    socket.on('user_status_change', handleStatusChange);
-    socket.on('user_status_res', handleStatusRes);
-    socket.on('user_typing_status', handleTypingStatus);
-    socket.on('messages_seen', handleMessagesSeen);
-
-    return () => {
-      socket.off('user_status_change', handleStatusChange);
-      socket.off('user_status_res', handleStatusRes);
-      socket.off('user_typing_status', handleTypingStatus);
-      socket.off('messages_seen', handleMessagesSeen);
-    };
   }, [user]);
 
   useEffect(() => {
