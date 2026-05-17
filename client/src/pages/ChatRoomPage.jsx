@@ -243,7 +243,7 @@ const ChatRoomPage = () => {
                   className="absolute right-0 mt-2 w-56 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
                 >
                   <div className="py-2 px-1 flex flex-col">
-                    <button onClick={() => { setShowOptions(false); navigate(`/user/${user.uid}`); }} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
+                    <button onClick={() => { setShowOptions(false); navigate(`/profile/${user.uid}`); }} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
                       <FiUser className="text-lg text-primary" /> View Profile
                     </button>
                     <button onClick={() => setShowOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">

@@ -10,7 +10,8 @@ import useChatStore from '../store/chatStore';
 import { FiEdit2 } from 'react-icons/fi';
 
 const UserProfilePage = () => {
-  const { id } = useParams();
+  const { uid } = useParams();
+  const id = uid; // Keep internal compatibility with 'id' variable
   const navigate = useNavigate();
   const { user: currentUser } = useAuthStore();
   

@@ -152,7 +152,7 @@ const AppContent = () => {
         <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
         <Route path="/room/:id" element={<ProtectedRoute><RoomPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/user/:id" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+        <Route path="/profile/:uid" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><AllFriendsPage /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><FriendRequestsPage /></ProtectedRoute>} />
         {/* Placeholder routes for the bottom nav items */}

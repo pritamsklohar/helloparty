@@ -625,13 +625,13 @@ const RoomPage = () => {
                           />
                         </div>
                         <h3 className="text-lg font-bold text-white mb-1">{userName}</h3>
-                        <p className="text-xs text-white/50 mb-6 font-mono">UID: {occupantUser?.userId || seatModal.userId}</p>
+                        <p className="text-xs text-white/50 mb-6 font-mono">UID: {occupantUser?.uid || seatModal.userId}</p>
                         <div className="grid grid-cols-2 gap-3 w-full">
-                          {occupantUser?.userId && (
+                          {occupantUser?.uid && (
                             <button 
                               onClick={() => {
                                 setSeatModal(null);
-                                navigate(`/profile/${occupantUser.userId}`);
+                                navigate(`/profile/${occupantUser.uid}`);
                               }}
                               className="col-span-2 flex items-center justify-center gap-2 bg-primary hover:bg-primaryHover py-3 rounded-2xl text-sm font-bold text-white transition-colors mb-1"
                             >
@@ -641,8 +641,8 @@ const RoomPage = () => {
                           <button 
                             onClick={() => {
                               setSeatModal(null);
-                              if (occupantUser?.userId) {
-                                navigate(`/chat/${occupantUser.userId}`);
+                              if (occupantUser?.uid) {
+                                navigate(`/chat/${occupantUser.uid}`);
                               }
                             }}
                             className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors"

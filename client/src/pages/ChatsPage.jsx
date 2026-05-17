@@ -238,7 +238,7 @@ const ChatsPage = () => {
                   onClick={() => {
                     if (searchUserId.trim()) {
                       setShowAddFriendModal(false);
-                      navigate(`/user/${searchUserId.trim()}`);
+                      navigate(`/profile/${searchUserId.trim()}`);
                     }
                   }}
                   className="w-full py-3.5 bg-gradient-to-r from-primary to-primaryHover text-white rounded-xl font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98] transition-all flex justify-center items-center gap-2"

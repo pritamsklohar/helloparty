@@ -110,7 +110,7 @@ const ProfilePage = () => {
               <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                   <h1 
-                    onClick={() => navigate(`/user/${profileData.uid}`)}
+                    onClick={() => navigate(`/profile/${profileData.uid}`)}
                     className="text-xl md:text-2xl font-bold flex items-center gap-2 cursor-pointer group"
                   >
                     {profileData.gender === 'male' && <FaMars className="text-[#0984e3] text-2xl" />}

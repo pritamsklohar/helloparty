@@ -163,7 +163,13 @@ router.put('/profile', protect, async (req, res) => {
 // Get user profile by UID
 router.get('/:uid', protect, async (req, res) => {
   try {
-    const user = await User.findOne({ uid: req.params.uid })
+    let query = { uid: req.params.uid };
+    // Support querying by database _id if param is 24 hex characters
+    if (req.params.uid.match(/^[0-9a-fA-F]{24}$/)) {
+      query = { $or: [{ _id: req.params.uid }, { uid: req.params.uid }] };
+    }
+
+    const user = await User.findOne(query)
       .select('-passwordHash -refreshTokens -email');
       
     if (!user) {

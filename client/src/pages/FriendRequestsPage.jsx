@@ -70,7 +70,7 @@ const FriendRequestsPage = () => {
               {requests.map(req => (
                 <div key={req._id} className="flex items-center gap-4 p-3 rounded-2xl bg-surfaceAlt/30 border border-white/5 group">
                   <div 
-                    onClick={() => navigate(`/user/${req.uid}`)}
+                    onClick={() => navigate(`/profile/${req.uid}`)}
                     className="w-14 h-14 rounded-full overflow-hidden bg-surface flex-shrink-0 cursor-pointer border-2 border-transparent hover:border-primary/50 transition-colors"
                   >
                     <img 
@@ -80,7 +80,7 @@ const FriendRequestsPage = () => {
                     />
                   </div>
                   <div 
-                    onClick={() => navigate(`/user/${req.uid}`)}
+                    onClick={() => navigate(`/profile/${req.uid}`)}
                     className="flex-1 min-w-0 cursor-pointer"
                   >
                     <h3 className="text-white font-bold truncate text-base group-hover:text-primary transition-colors">{req.username}</h3>
