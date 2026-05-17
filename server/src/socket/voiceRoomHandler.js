@@ -513,7 +513,7 @@ const voiceRoomHandler = (io, socket) => {
   });
 
   // 5. Clean exit or sudden disconnect
-  const exitUser = (roomId, socketId, isSuddenDisconnect = false) => {
+  const exitUser = async (roomId, socketId, isSuddenDisconnect = false) => {
     const room = voiceRooms.get(roomId);
     if (!room) return;
 
@@ -711,9 +711,9 @@ const voiceRoomHandler = (io, socket) => {
     io.in(roomId).emit('peer:user_left', { userId: socketId });
   };
 
-  socket.on('peer:leave_room', ({ roomId }, callback) => {
+  socket.on('peer:leave_room', async ({ roomId }, callback) => {
     try {
-      exitUser(roomId, socket.id, false); // isSuddenDisconnect = false
+      await exitUser(roomId, socket.id, false); // isSuddenDisconnect = false
       socket.leave(roomId);
       socket.voiceRoomId = null;
       socket.voiceUserHandle = null;
@@ -725,13 +725,13 @@ const voiceRoomHandler = (io, socket) => {
     }
   });
 
-  socket.on('disconnecting', () => {
+  socket.on('disconnecting', async () => {
     try {
-      Array.from(socket.rooms).forEach(roomId => {
+      for (const roomId of socket.rooms) {
         if (roomId !== socket.id) {
-          exitUser(roomId, socket.id, true); // isSuddenDisconnect = true
+          await exitUser(roomId, socket.id, true); // isSuddenDisconnect = true
         }
-      });
+      }
     } catch (err) {
       console.error("Error in disconnect cleaner:", err.message);
     }
