@@ -48,8 +48,17 @@ export const VoiceRoomProvider = ({ children }) => {
 
     // 2. Shut down Socket and clear signaling channels
     if (socketRef.current) {
-      socketRef.current.emit('peer:leave_room', { roomId });
-      socketRef.current.disconnect();
+      const socketToDisconnect = socketRef.current;
+      let disconnected = false;
+      const doDisconnect = () => {
+        if (!disconnected) {
+          disconnected = true;
+          socketToDisconnect.disconnect();
+        }
+      };
+      
+      socketToDisconnect.emit('peer:leave_room', { roomId }, doDisconnect);
+      setTimeout(doDisconnect, 250); // safety fallback
       socketRef.current = null;
     }
 

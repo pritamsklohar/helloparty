@@ -709,7 +709,7 @@ const voiceRoomHandler = (io, socket) => {
     io.in(roomId).emit('peer:user_left', { userId: socketId });
   };
 
-  socket.on('peer:leave_room', ({ roomId }) => {
+  socket.on('peer:leave_room', ({ roomId }, callback) => {
     try {
       exitUser(roomId, socket.id, false); // isSuddenDisconnect = false
       socket.leave(roomId);
@@ -717,6 +717,9 @@ const voiceRoomHandler = (io, socket) => {
       socket.voiceUserHandle = null;
     } catch (err) {
       console.error("Error in peer:leave_room:", err.message);
+    }
+    if (typeof callback === 'function') {
+      callback();
     }
   });
 
