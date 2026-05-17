@@ -69,7 +69,7 @@ const AllFriendsPage = () => {
               {friends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase())).map(friend => (
                 <div 
                   key={friend._id} 
-                  onClick={() => navigate(`/profile/${friend.uid}`)}
+                  onClick={() => navigate(`/user/${friend.uid}`)}
                   className="flex items-center gap-4 p-3 rounded-2xl hover:bg-surfaceAlt/50 transition-colors cursor-pointer border border-transparent hover:border-border group"
                 >
                   <div className="w-14 h-14 rounded-full overflow-hidden bg-surface flex-shrink-0 border-2 border-transparent group-hover:border-primary/50 transition-colors">
@@ -159,7 +159,7 @@ const AllFriendsPage = () => {
                   onClick={() => {
                     if (searchUserId.trim()) {
                       setShowAddFriendModal(false);
-                      navigate(`/profile/${searchUserId.trim()}`);
+                      navigate(`/user/${searchUserId.trim()}`);
                     }
                   }}
                   className="w-full py-3.5 bg-gradient-to-r from-primary to-primaryHover text-white rounded-xl font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98] transition-all flex justify-center items-center gap-2"

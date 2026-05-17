@@ -631,7 +631,7 @@ const RoomPage = () => {
                             <button 
                               onClick={() => {
                                 setSeatModal(null);
-                                navigate(`/profile/${occupantUser.uid}`);
+                                navigate(`/user/${occupantUser.uid}`);
                               }}
                               className="col-span-2 flex items-center justify-center gap-2 bg-primary hover:bg-primaryHover py-3 rounded-2xl text-sm font-bold text-white transition-colors mb-1"
                             >
