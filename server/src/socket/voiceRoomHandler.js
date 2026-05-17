@@ -445,7 +445,7 @@ const voiceRoomHandler = (io, socket) => {
         // Notify target client
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket) {
-          targetSocket.emit('peer:kicked_by_owner');
+          targetSocket.emit('peer:kicked_by_owner', { remainingMinutes: 10, remainingSeconds: 0 });
           targetSocket.leave(roomId);
         }
       }

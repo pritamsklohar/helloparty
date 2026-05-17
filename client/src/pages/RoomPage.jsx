@@ -9,6 +9,7 @@ import io from 'socket.io-client';
 import Peer from 'simple-peer';
 import { useRef } from 'react';
 import useAuthStore from '../store/authStore';
+import toast from 'react-hot-toast';
 
 const RoomPage = () => {
   const { id } = useParams();
@@ -220,8 +221,16 @@ const RoomPage = () => {
           }
         });
 
-        socketRef.current.on('peer:kicked_by_owner', () => {
-          toast.error("You have been kicked from the room by the owner.");
+        socketRef.current.on('peer:kicked_by_owner', (data) => {
+          const min = data?.remainingMinutes ?? 10;
+          const sec = data?.remainingSeconds ?? 0;
+          toast.error(`You are kicked please rejoin again in ${min} min ${sec} sec`);
+          closeRoom();
+          navigate('/lobby');
+        });
+
+        socketRef.current.on('voice_room:error', ({ message }) => {
+          toast.error(message);
           closeRoom();
           navigate('/lobby');
         });
@@ -267,7 +276,9 @@ const RoomPage = () => {
 
     return () => {
       // Clean up: AUTOMATICALLY minimize the room globally rather than disconnecting!
-      setIsMinimized(true);
+      if (socketRef.current && roomData) {
+        setIsMinimized(true);
+      }
     };
   }, [id, navigate]);
 
