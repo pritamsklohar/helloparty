@@ -45,12 +45,26 @@ const VoicePage = () => {
       setRooms(prev => prev.filter(r => r._id !== roomId));
     };
 
+    const handleRoomCountUpdated = ({ roomId, activeMembersCount }) => {
+      setRooms(prev => prev.map(room => {
+        if (room._id === roomId) {
+          return {
+            ...room,
+            members: Array(activeMembersCount).fill(null)
+          };
+        }
+        return room;
+      }));
+    };
+
     socket.on('room_created', handleRoomCreated);
     socket.on('room_deleted', handleRoomDeleted);
+    socket.on('room_count_updated', handleRoomCountUpdated);
 
     return () => {
       socket.off('room_created', handleRoomCreated);
       socket.off('room_deleted', handleRoomDeleted);
+      socket.off('room_count_updated', handleRoomCountUpdated);
     };
   }, []);
 

@@ -5,11 +5,14 @@ const User = require('../models/User');
 const voiceRooms = new Map();
 const ownerDisconnectTimeouts = new Map(); // roomId -> TimeoutObject
 
-const updateActiveMembersCount = (room) => {
+const updateActiveMembersCount = (room, roomId = null, io = null) => {
   let count = room.owner ? 1 : 0;
   count += room.seats.filter(s => s !== null).length;
   count += room.waitingList.length;
   room.activeMembers = count;
+  if (io && roomId) {
+    io.emit('room_count_updated', { roomId, activeMembersCount: count });
+  }
 };
 
 const getFormattedTime = () => {
@@ -180,7 +183,7 @@ const voiceRoomHandler = (io, socket) => {
           room.waitingList.push(newUser);
           addRoomLog(room, `${user.username} entered the room and joined the waiting list.`);
         }
-        updateActiveMembersCount(room);
+        updateActiveMembersCount(room, roomId, io);
       }
 
       // Gather other users in the room (socketId, user details)
@@ -297,7 +300,7 @@ const voiceRoomHandler = (io, socket) => {
       room.seats[seatIndex] = user;
 
       addRoomLog(room, `${user.name} sat down in seat ${seatIndex + 1}.`);
-      updateActiveMembersCount(room);
+      updateActiveMembersCount(room, roomId, io);
 
       // Broadcast updated seats to all participants in real-time
       broadcastSeatsUpdated(io, roomId, room);
@@ -327,7 +330,7 @@ const voiceRoomHandler = (io, socket) => {
         room.waitingList.push(user);
 
         addRoomLog(room, `${user.name} stood up from seat.`);
-        updateActiveMembersCount(room);
+        updateActiveMembersCount(room, roomId, io);
 
         // Broadcast updated seats in real-time
         broadcastSeatsUpdated(io, roomId, room);
@@ -417,7 +420,7 @@ const voiceRoomHandler = (io, socket) => {
         room.waitingList.push(targetUser);
 
         addRoomLog(room, `${room.owner.name} stood up ${targetUser.name} from seat.`);
-        updateActiveMembersCount(room);
+        updateActiveMembersCount(room, roomId, io);
 
         // Broadcast updated seats in real-time
         broadcastSeatsUpdated(io, roomId, room);
@@ -599,7 +602,7 @@ const voiceRoomHandler = (io, socket) => {
             }
           }
 
-          updateActiveMembersCount(currentRoom);
+          updateActiveMembersCount(currentRoom, roomId, io);
           io.in(roomId).emit('peer:seats_updated', {
             seats: currentRoom.seats.map(u => u ? u.id : null),
             seatsUsers: currentRoom.seats.filter(u => u !== null).map(u => ({
@@ -702,7 +705,7 @@ const voiceRoomHandler = (io, socket) => {
       }
     }
 
-    updateActiveMembersCount(room);
+    updateActiveMembersCount(room, roomId, io);
 
     // Broadcast seats updated
     broadcastSeatsUpdated(io, roomId, room);

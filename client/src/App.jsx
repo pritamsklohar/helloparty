@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
 
@@ -42,12 +42,20 @@ const AppContent = () => {
   const { isAuthenticated, user } = useAuthStore();
   const { fetchConversations, addMessage, removeMessage, conversations } = useChatStore();
   const location = useLocation();
+  const navigate = useNavigate();
   
   useEffect(() => {
     checkAuth();
-    // Reset inRoom local storage on initial mount/refresh to keep it always in sync
-    localStorage.setItem('inRoom', 'false');
-  }, [checkAuth]);
+    
+    // Restore active room session on page refresh/mount
+    const activeRoomId = localStorage.getItem('activeRoomId');
+    if (activeRoomId) {
+      localStorage.setItem('inRoom', 'true');
+      navigate(`/room/${activeRoomId}`);
+    } else {
+      localStorage.setItem('inRoom', 'false');
+    }
+  }, [checkAuth, navigate]);
 
   // Global Socket Connection & Background Sync
   useEffect(() => {
