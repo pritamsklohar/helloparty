@@ -6,30 +6,46 @@ import { FaMars, FaVenus } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
+import useChatStore from '../store/chatStore';
 import { FiEdit2 } from 'react-icons/fi';
 
 const UserProfilePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user: currentUser } = useAuthStore();
-  const [profileData, setProfileData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [friendStatus, setFriendStatus] = useState('none');
+  
+  const usersCache = useChatStore((state) => state.usersCache);
+  const fetchUserDetail = useChatStore((state) => state.fetchUserDetail);
+  
+  const cachedProfile = usersCache[id];
+  const [profileData, setProfileData] = useState(cachedProfile || null);
+  const [loading, setLoading] = useState(!cachedProfile);
+  const [friendStatus, setFriendStatus] = useState(cachedProfile?.friendStatus || 'none');
   const [showOptions, setShowOptions] = useState(false);
   const [latestMemory, setLatestMemory] = useState(null);
 
   const isOwnProfile = currentUser?._id === profileData?._id || currentUser?.uid === profileData?.uid;
 
   useEffect(() => {
-    const fetchUser = async () => {
+    if (cachedProfile) {
+      setProfileData(cachedProfile);
+      setFriendStatus(cachedProfile.friendStatus || 'none');
+    }
+  }, [cachedProfile]);
+
+  useEffect(() => {
+    const loadProfile = async () => {
       try {
-        setLoading(true);
-        const res = await api.get(`/users/${id}`);
-        setProfileData(res.data.user);
-        setFriendStatus(res.data.friendStatus);
+        if (!cachedProfile) {
+          setLoading(true);
+        }
+        
+        const freshProfile = await fetchUserDetail(id, !!cachedProfile);
+        setProfileData(freshProfile);
+        setFriendStatus(freshProfile.friendStatus || 'none');
         
         try {
-          const memRes = await api.get(`/memories/user/${res.data.user._id}`);
+          const memRes = await api.get(`/memories/user/${freshProfile._id}`);
           if (memRes.data && memRes.data.length > 0) {
             setLatestMemory(memRes.data[0]);
           }
@@ -38,17 +54,19 @@ const UserProfilePage = () => {
         }
       } catch (error) {
         console.error("Error fetching user:", error);
-        toast.error("User not found or does not exist!");
-        navigate(-1);
+        if (!cachedProfile) {
+          toast.error("User not found or does not exist!");
+          navigate(-1);
+        }
       } finally {
         setLoading(false);
       }
     };
     
     if (id) {
-      fetchUser();
+      loadProfile();
     }
-  }, [id, navigate]);
+  }, [id, cachedProfile, fetchUserDetail, navigate]);
 
   const handleAddFriend = async () => {
     try {

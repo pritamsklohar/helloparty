@@ -22,7 +22,10 @@ const useChatStore = create((set, get) => ({
     }
     try {
       const res = await api.get(`/users/${uid}`);
-      const userProfile = res.data.user;
+      const userProfile = {
+        ...res.data.user,
+        friendStatus: res.data.friendStatus
+      };
       set((state) => ({
         usersCache: {
           ...state.usersCache,

@@ -600,25 +600,55 @@ const RoomPage = () => {
                 className="bg-surfaceAlt/95 backdrop-blur-xl border border-white/10 w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl relative z-10"
               >
                 {seatModal.type === 'PROFILE' ? (
-                  <div className="p-6 flex flex-col items-center text-center">
-                    <div className="w-20 h-20 rounded-full border-2 border-primary p-0.5 mb-4 shadow-lg shadow-primary/20">
-                      <img 
-                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seatModal.userId}`} 
-                        alt="Profile" 
-                        className="w-full h-full rounded-full object-cover bg-bg" 
-                      />
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-1">Guest {seatModal.seatIndex + 1}</h3>
-                    <p className="text-xs text-white/50 mb-6 font-mono">UID: {seatModal.userId.substring(0, 8)}</p>
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                      <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors">
-                        <FiSend className="text-primary" /> Message
-                      </button>
-                      <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors">
-                        <FiUserPlus className="text-primary" /> Follow
-                      </button>
-                    </div>
-                  </div>
+                  (() => {
+                    const occupantUser = socketToUserRef.current.get(seatModal.userId);
+                    const avatarUrl = occupantUser?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seatModal.userId}`;
+                    const userName = occupantUser?.username || `Guest ${seatModal.seatIndex + 1}`;
+                    
+                    return (
+                      <div className="p-6 flex flex-col items-center text-center">
+                        <div className="w-20 h-20 rounded-full border-2 border-primary p-0.5 mb-4 shadow-lg shadow-primary/20 overflow-hidden">
+                          <img 
+                            src={avatarUrl} 
+                            alt={userName} 
+                            className="w-full h-full rounded-full object-cover bg-bg" 
+                          />
+                        </div>
+                        <h3 className="text-lg font-bold text-white mb-1">{userName}</h3>
+                        <p className="text-xs text-white/50 mb-6 font-mono">UID: {occupantUser?.userId || seatModal.userId}</p>
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                          {occupantUser?.userId && (
+                            <button 
+                              onClick={() => {
+                                setSeatModal(null);
+                                navigate(`/profile/${occupantUser.userId}`);
+                              }}
+                              className="col-span-2 flex items-center justify-center gap-2 bg-primary hover:bg-primaryHover py-3 rounded-2xl text-sm font-bold text-white transition-colors mb-1"
+                            >
+                              <FiUserPlus /> View Profile
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => {
+                              setSeatModal(null);
+                              if (occupantUser?.userId) {
+                                navigate(`/chat/${occupantUser.userId}`);
+                              }
+                            }}
+                            className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors"
+                          >
+                            <FiSend className="text-primary" /> Message
+                          </button>
+                          <button 
+                            onClick={() => setSeatModal(null)}
+                            className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-sm font-medium transition-colors"
+                          >
+                            <FiX className="text-red-400" /> Close
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="p-6 flex flex-col items-center text-center">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
