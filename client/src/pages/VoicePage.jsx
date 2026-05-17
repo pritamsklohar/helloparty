@@ -4,6 +4,7 @@ import { FiSearch, FiPlus, FiX, FiLock, FiUnlock, FiVideo, FiMic } from 'react-i
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { socket } from '../services/socket';
 
 const VoicePage = () => {
   const navigate = useNavigate();
@@ -32,6 +33,25 @@ const VoicePage = () => {
 
   useEffect(() => {
     fetchRooms();
+
+    const handleRoomCreated = (newRoom) => {
+      setRooms(prev => {
+        if (prev.some(r => r._id === newRoom._id)) return prev;
+        return [newRoom, ...prev];
+      });
+    };
+
+    const handleRoomDeleted = (roomId) => {
+      setRooms(prev => prev.filter(r => r._id !== roomId));
+    };
+
+    socket.on('room_created', handleRoomCreated);
+    socket.on('room_deleted', handleRoomDeleted);
+
+    return () => {
+      socket.off('room_created', handleRoomCreated);
+      socket.off('room_deleted', handleRoomDeleted);
+    };
   }, []);
 
   const filteredRooms = rooms.filter(room => 

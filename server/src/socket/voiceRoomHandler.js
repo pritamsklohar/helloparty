@@ -594,6 +594,8 @@ const voiceRoomHandler = (io, socket) => {
             try {
               await Room.findByIdAndDelete(roomId);
               console.log(`Deleted empty room ${roomId} from DB after owner 2m timeout`);
+              // Emit room deletion in real-time
+              io.emit('room_deleted', roomId);
             } catch (err) {
               console.error("Failed to delete room from DB after timeout:", err.message);
             }
@@ -675,6 +677,8 @@ const voiceRoomHandler = (io, socket) => {
           try {
             await Room.findByIdAndDelete(roomId);
             console.log(`Deleted empty room ${roomId} from DB immediately after owner left`);
+            // Emit room deletion in real-time
+            io.emit('room_deleted', roomId);
           } catch (err) {
             console.error("Failed to delete room from DB immediately:", err.message);
           }

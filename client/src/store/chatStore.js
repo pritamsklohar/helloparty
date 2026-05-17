@@ -190,6 +190,15 @@ const useChatStore = create((set, get) => ({
 
   // Helper to dynamically update the last message & unread status in the local conversation list
   updateConversationLastMessage: (chatId, message, isActive = false) => {
+    // If the conversation is new and does not exist in the local array, fetch in the background to add it
+    const exists = get().conversations.some((conv) => conv._id === chatId || conv.uid === chatId || conv.id === chatId);
+    if (!exists) {
+      setTimeout(() => {
+        get().fetchConversations(true);
+      }, 300);
+      return;
+    }
+
     set((state) => {
       const conversations = state.conversations.map((conv) => {
         // Match either direct chat (using uid or _id) or group chat

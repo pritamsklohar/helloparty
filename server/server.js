@@ -23,6 +23,12 @@ app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Expose socket server to REST routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Database connection
 connectDB();
 

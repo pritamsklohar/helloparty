@@ -32,6 +32,11 @@ router.post('/', protect, async (req, res) => {
     // Populate host info before returning so frontend has it immediately
     await room.populate('host', 'username avatarUrl');
     
+    // Broadcast room creation in real-time
+    if (req.io) {
+      req.io.emit('room_created', room);
+    }
+    
     res.status(201).json(room);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -61,6 +66,12 @@ router.delete('/:id', protect, async (req, res) => {
     }
 
     await Room.findByIdAndDelete(req.params.id);
+    
+    // Broadcast room deletion in real-time
+    if (req.io) {
+      req.io.emit('room_deleted', req.params.id);
+    }
+    
     res.json({ message: 'Room deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
