@@ -39,6 +39,7 @@ const RoomPage = () => {
   } = useVoiceRoom();
 
   const [loading, setLoading] = useState(!roomData);
+  const [activeMembersCount, setActiveMembersCount] = useState(roomData?.members?.length || 1);
   const [message, setMessage] = useState('');
   const [gameActive, setGameActive] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -130,7 +131,8 @@ const RoomPage = () => {
           });
         });
 
-        socketRef.current.on('peer:existing_users', ({ users, seats: initialSeats }) => {
+        socketRef.current.on('peer:existing_users', ({ users, seats: initialSeats, activeMembersCount: count }) => {
+          if (count !== undefined) setActiveMembersCount(count);
           if (initialSeats) setSeats(initialSeats);
           users.forEach(({ socketId, user: userData }) => {
             socketToUserRef.current.set(socketId, userData);
@@ -142,7 +144,8 @@ const RoomPage = () => {
           updateRemotePeers();
         });
 
-         socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers, owner }) => {
+         socketRef.current.on('peer:seats_updated', ({ seats: updatedSeats, seatsUsers, owner, activeMembersCount: count }) => {
+          if (count !== undefined) setActiveMembersCount(count);
           setSeats(updatedSeats);
           if (seatsUsers) {
             seatsUsers.forEach(({ socketId, user: userData }) => {
@@ -501,7 +504,7 @@ const RoomPage = () => {
           <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm border border-white/10 px-2.5 py-1 rounded-full">
             <FiUsers className="text-white/60 text-xs" />
             <span className="text-xs font-bold text-white">
-              {loading ? '...' : (roomData?.members?.length || 1)}
+              {loading ? '...' : activeMembersCount}
             </span>
           </div>
           

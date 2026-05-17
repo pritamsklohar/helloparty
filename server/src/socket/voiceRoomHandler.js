@@ -43,7 +43,8 @@ const broadcastSeatsUpdated = (io, roomId, room) => {
   io.in(roomId).emit('peer:seats_updated', {
     seats: room.seats.map(u => u ? u.id : null),
     seatsUsers,
-    owner: ownerData
+    owner: ownerData,
+    activeMembersCount: room.activeMembers
   });
 };
 
@@ -225,7 +226,8 @@ const voiceRoomHandler = (io, socket) => {
       // Respond to the joining peer with other users and seats
       socket.emit('peer:existing_users', {
         users: otherUsers,
-        seats: room.seats.map(u => u ? u.id : null)
+        seats: room.seats.map(u => u ? u.id : null),
+        activeMembersCount: room.activeMembers
       });
 
       // Broadcast to other users in room
