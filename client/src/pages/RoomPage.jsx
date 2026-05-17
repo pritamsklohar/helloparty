@@ -13,37 +13,39 @@ import useAuthStore from '../store/authStore';
 const RoomPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { joinRoom, closeRoom } = useVoiceRoom();
-  const [roomData, setRoomData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isMuted, setIsMuted] = useState(false); 
+  
+  const {
+    activeRoom,
+    isMinimized, setIsMinimized,
+    roomData, setRoomData,
+    isMuted, setIsMuted,
+    isSpeakerOff, setIsSpeakerOff,
+    seats, setSeats,
+    messages, setMessages,
+    remotePeers, setRemotePeers,
+    activeSpeakerId, setActiveSpeakerId,
+    speakingPeers, setSpeakingPeers,
+    mutedPeers, setMutedPeers,
+    socketRef,
+    localStreamRef,
+    peersRef,
+    socketToUserRef,
+    myUserId,
+    isInitializingRef,
+    joinRoom,
+    closeRoom
+  } = useVoiceRoom();
+
+  const [loading, setLoading] = useState(!roomData);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
   const [gameActive, setGameActive] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [speakingPeers, setSpeakingPeers] = useState({}); 
-  
-  const [isSpeakerOff, setIsSpeakerOff] = useState(false);
-  const [activeSpeakerId, setActiveSpeakerId] = useState(null); 
   const [localSpeaking, setLocalSpeaking] = useState(false);
-  const [mutedPeers, setMutedPeers] = useState(new Set()); 
-  
-  // WebRTC & Seats Refs
-  const socketRef = useRef();
-  const localStreamRef = useRef();
-  const peersRef = useRef(new Map()); // Map<userId, { peer, stream }>
-  const [remotePeers, setRemotePeers] = useState([]); // Array of userIds to trigger re-render
-  const isInitializingRef = useRef(false);
-  
-  // Mapping socketId -> userObject { userId, username, avatarUrl }
-  const socketToUserRef = useRef(new Map());
+  const [seatModal, setSeatModal] = useState(null); 
   const { user: currentUser } = useAuthStore();
   
   const ownerId = roomData?.host?.id || roomData?.host?._id;
   const isOwner = (uid) => uid === ownerId;
-  const [seats, setSeats] = useState(Array(8).fill(null));
-  const [seatModal, setSeatModal] = useState(null); // { type, seatIndex, userId }
-  const myUserId = useRef(null);
 
   // Helper to update UI list
   const updateRemotePeers = () => {
@@ -54,6 +56,9 @@ const RoomPage = () => {
     // 1. Get Room Data
     const fetchRoom = async () => {
       try {
+        if (!roomData) {
+          setLoading(true);
+        }
         const res = await api.get(`/rooms/${id}`);
         setRoomData(res.data);
         joinRoom(res.data);
@@ -66,7 +71,7 @@ const RoomPage = () => {
     };
     fetchRoom();
 
-    // 2. Initialize WebRTC & Socket
+    // 2. Initialize WebRTC & Socket (only if not already running globally!)
     const initWebRTC = async () => {
       if (isInitializingRef.current || socketRef.current) return;
       isInitializingRef.current = true;
@@ -91,6 +96,7 @@ const RoomPage = () => {
             roomId: id, 
             user: {
               userId: currentUser?._id || currentUser?.id,
+              uid: currentUser?.uid, // Send numeric display UID
               username: currentUser?.username,
               avatarUrl: currentUser?.avatarUrl
             }
@@ -202,18 +208,19 @@ const RoomPage = () => {
       }
     };
 
-    initWebRTC();
+    // Initialize WebRTC and Socket only if not already initialized
+    if (!socketRef.current) {
+      initWebRTC();
+    } else {
+      updateRemotePeers();
+    }
+
+    // Set minimized to false on mount/expansion
+    setIsMinimized(false);
 
     return () => {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-      peersRef.current.forEach(data => data.peer.destroy());
-      peersRef.current.clear();
+      // Clean up: AUTOMATICALLY minimize the room globally rather than disconnecting!
+      setIsMinimized(true);
     };
   }, [id, navigate]);
 

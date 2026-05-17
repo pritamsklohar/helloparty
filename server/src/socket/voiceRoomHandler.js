@@ -100,6 +100,8 @@ const voiceRoomHandler = (io, socket) => {
 
         const newUser = {
           id: socket.id,
+          userId: user.userId,
+          uid: user.uid,
           name: user.username,
           handle: user.username,
           avatar: user.avatarUrl || '👤',
@@ -131,7 +133,8 @@ const voiceRoomHandler = (io, socket) => {
         otherUsers.push({
           socketId: room.owner.id,
           user: {
-            userId: room.owner.handle,
+            userId: room.owner.userId,
+            uid: room.owner.uid,
             username: room.owner.name,
             avatarUrl: room.owner.avatar
           }
@@ -142,7 +145,8 @@ const voiceRoomHandler = (io, socket) => {
           otherUsers.push({
             socketId: u.id,
             user: {
-              userId: u.handle,
+              userId: u.userId,
+              uid: u.uid,
               username: u.name,
               avatarUrl: u.avatar
             }
@@ -154,7 +158,8 @@ const voiceRoomHandler = (io, socket) => {
           otherUsers.push({
             socketId: u.id,
             user: {
-              userId: u.handle,
+              userId: u.userId,
+              uid: u.uid,
               username: u.name,
               avatarUrl: u.avatar
             }
@@ -172,7 +177,8 @@ const voiceRoomHandler = (io, socket) => {
       socket.to(roomId).emit('peer:new_user_joined', {
         socketId: socket.id,
         user: {
-          userId: user.username,
+          userId: user.userId,
+          uid: user.uid,
           username: user.username,
           avatarUrl: user.avatarUrl
         }
@@ -211,6 +217,8 @@ const voiceRoomHandler = (io, socket) => {
         // Fallback user if not in waiting list
         user = {
           id: socket.id,
+          userId: socket.voiceUserObj?.userId,
+          uid: socket.voiceUserObj?.uid,
           name: socket.voiceUserHandle || "Guest",
           handle: socket.voiceUserHandle || "Guest",
           avatar: socket.voiceUserObj?.avatarUrl || '👤',
