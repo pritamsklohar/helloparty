@@ -216,6 +216,13 @@ router.post('/send-request/:uid', protect, async (req, res) => {
     targetUser.friendRequests.push(req.user._id);
     await targetUser.save();
     
+    if (req.io) {
+      req.io.to(`user_${targetUser._id}`).emit('friend_request_received', {
+        senderId: req.user._id,
+        senderUsername: req.user.username
+      });
+    }
+    
     res.json({ message: 'Friend request sent' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -241,6 +248,13 @@ router.post('/accept-request/:id', protect, async (req, res) => {
     await User.findByIdAndUpdate(targetId, {
       $push: { friends: req.user._id }
     });
+
+    if (req.io) {
+      req.io.to(`user_${targetId}`).emit('friend_request_accepted', {
+        acceptorId: req.user._id,
+        acceptorUsername: req.user.username
+      });
+    }
 
     res.json({ message: 'Friend request accepted' });
   } catch (error) {

@@ -72,7 +72,7 @@ const UserProfilePage = () => {
     try {
       await api.post(`/users/send-request/${profileData.uid}`);
       setFriendStatus('sent');
-      toast.success('Friend request sent!');
+      toast.success('Request Sent');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to send request');
     }
@@ -82,7 +82,7 @@ const UserProfilePage = () => {
     try {
       await api.post(`/users/accept-request/${profileData._id}`);
       setFriendStatus('friend');
-      toast.success('Friend request accepted!');
+      toast.success('Request accepted');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to accept request');
     }

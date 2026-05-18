@@ -29,7 +29,7 @@ const FriendRequestsPage = () => {
     try {
       await api.post(`/users/accept-request/${id}`);
       setRequests(requests.filter(r => r._id !== id));
-      toast.success('Friend request accepted!');
+      toast.success('Request accepted');
     } catch (err) {
       toast.error('Failed to accept request');
     }

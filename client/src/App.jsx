@@ -225,16 +225,45 @@ const AppContent = () => {
         });
       };
 
+      const handleFriendRequestReceived = (data) => {
+        toast(`You have a new friend Request`, {
+          icon: '👥',
+          style: {
+            borderRadius: '16px',
+            background: '#1a1a2e',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }
+        });
+      };
+
+      const handleFriendRequestAccepted = (data) => {
+        const usernameVal = data?.acceptorUsername || 'A user';
+        toast(`${usernameVal} accepted your request`, {
+          icon: '🎉',
+          style: {
+            borderRadius: '16px',
+            background: '#1a1a2e',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }
+        });
+      };
+
       socket.on('receive_private_message', handleReceivePrivateMessage);
       socket.on('message_sent', handleMessageSent);
       socket.on('receive_group_message', handleReceiveGroupMessage);
       socket.on('message_deleted', handleMessageDeleted);
+      socket.on('friend_request_received', handleFriendRequestReceived);
+      socket.on('friend_request_accepted', handleFriendRequestAccepted);
 
       return () => {
         socket.off('receive_private_message', handleReceivePrivateMessage);
         socket.off('message_sent', handleMessageSent);
         socket.off('receive_group_message', handleReceiveGroupMessage);
         socket.off('message_deleted', handleMessageDeleted);
+        socket.off('friend_request_received', handleFriendRequestReceived);
+        socket.off('friend_request_accepted', handleFriendRequestAccepted);
         disconnectSocket();
       };
     }
