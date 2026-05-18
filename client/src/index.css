@@ -4,9 +4,32 @@
 
 @layer base {
   html, body {
-    @apply bg-bg text-white/90 font-sans;
+    @apply bg-bg text-slate-800 font-sans;
     scroll-behavior: smooth;
   }
+}
+
+/* Light Theme Color Fixes for CTA Elements */
+button, 
+.bg-primary, 
+.bg-gradient-to-r, 
+.bg-green-500, 
+.bg-red-500, 
+.bg-blue-500,
+.bg-primaryHover {
+  color: #FFFFFF !important;
+}
+
+button *,
+.bg-primary *,
+.bg-gradient-to-r * {
+  color: inherit;
+}
+
+/* Ensure placeholder text is readable */
+input::placeholder, textarea::placeholder {
+  color: #64748B !important;
+  opacity: 0.6;
 }
 
 /* Custom scrollbar */
@@ -14,13 +37,13 @@
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  @apply bg-surface;
+  @apply bg-surfaceAlt;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-primary rounded-full;
+  @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
 }
 
 /* Selection */
 ::selection {
-  @apply bg-primary text-white;
+  @apply bg-primary/20 text-primary;
 }
