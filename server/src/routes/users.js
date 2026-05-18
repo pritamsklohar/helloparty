@@ -110,7 +110,7 @@ router.get('/friends/all', protect, async (req, res) => {
 // Update profile
 router.put('/profile', protect, async (req, res) => {
   try {
-    const { username, bio, avatarUrl, gender, country, dob } = req.body;
+    const { username, bio, avatarUrl, gender, country, dob, inRoom } = req.body;
     const userId = req.user._id;
 
     // Fetch current user for comparison
@@ -135,6 +135,7 @@ router.put('/profile', protect, async (req, res) => {
     if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
     if (gender !== undefined) updateData.gender = gender;
     if (country !== undefined) updateData.country = country;
+    if (inRoom !== undefined) updateData.inRoom = inRoom;
     
     // Handle date specifically
     if (dob !== undefined) {

@@ -23,8 +23,9 @@ import CreateGroupPage from './pages/CreateGroupPage';
 import GroupChatPage from './pages/GroupChatPage';
 import GroupInfoPage from './pages/GroupInfoPage';
 import BottomNav from './components/layout/BottomNav';
-import { VoiceRoomProvider } from './context/VoiceRoomContext';
+import { VoiceRoomProvider, useVoiceRoom } from './context/VoiceRoomContext';
 import MinimizedRoom from './components/MinimizedRoom';
+import api from './services/api';
 
 import useChatStore from './store/chatStore';
 import { socket, connectSocket, disconnectSocket } from './services/socket';
@@ -44,6 +45,8 @@ const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  const { joinRoom, minimizeRoom, closeRoom, socketRef } = useVoiceRoom();
+
   // Track last visited non-room page
   useEffect(() => {
     if (!location.pathname.startsWith('/room/')) {
@@ -56,16 +59,74 @@ const AppContent = () => {
     checkAuth();
   }, [checkAuth]);
   
-  // Restore active room session exactly once on initial page mount/refresh
+  // Restore and validate active room session in real-time
   useEffect(() => {
-    const activeRoomId = localStorage.getItem('activeRoomId');
-    if (activeRoomId) {
-      localStorage.setItem('inRoom', 'true');
-      navigate(`/room/${activeRoomId}`);
-    } else {
-      localStorage.setItem('inRoom', 'false');
+    if (isAuthenticated && user?.inRoom) {
+      const restoreAndValidateRoom = async () => {
+        try {
+          const res = await api.get(`/rooms/${user.inRoom}`);
+          const room = res.data;
+          
+          if (room) {
+            // Room exists! Preload state and show minimized window
+            const isFullPage = window.location.pathname === `/room/${user.inRoom}`;
+            joinRoom(room);
+            if (!isFullPage) {
+              minimizeRoom();
+              localStorage.setItem('roomMinimized', 'true');
+            }
+          }
+        } catch (err) {
+          console.warn("Active room session validation failed (room does not exist):", err.message);
+          
+          // Clear active session immediately in DB & local store (0ms)
+          try {
+            await api.put('/users/profile', { inRoom: null });
+          } catch (updateErr) {
+            console.error("Failed to clear inRoom in database:", updateErr.message);
+          }
+          closeRoom();
+        }
+      };
+      
+      restoreAndValidateRoom();
+    } else if (isAuthenticated && !user?.inRoom) {
+      // Clear local states if no active room is specified on the user in MongoDB
+      const activeRoomId = localStorage.getItem('activeRoomId');
+      if (activeRoomId) {
+        closeRoom();
+      }
     }
-  }, []);
+  }, [isAuthenticated, user?.inRoom]);
+
+  // Handle global background socket events for minimized room
+  useEffect(() => {
+    const socketInstance = socketRef.current;
+    if (!socketInstance) return;
+
+    const handleKicked = (data) => {
+      const min = data?.remainingMinutes ?? 10;
+      const sec = data?.remainingSeconds ?? 0;
+      toast.error(`You are kicked please rejoin again in ${min} min ${sec} sec`);
+      closeRoom();
+      navigate('/lobby');
+    };
+
+    const handleAdminStoodUp = () => {
+      toast.error("You have been stood up from your seat by the owner.");
+      if (socketRef.current && user?.inRoom) {
+        socketRef.current.emit('peer:stand_up', { roomId: user.inRoom });
+      }
+    };
+
+    socketInstance.on('peer:kicked_by_owner', handleKicked);
+    socketInstance.on('peer:admin_stood_up', handleAdminStoodUp);
+
+    return () => {
+      socketInstance.off('peer:kicked_by_owner', handleKicked);
+      socketInstance.off('peer:admin_stood_up', handleAdminStoodUp);
+    };
+  }, [socketRef.current, user?.inRoom]);
 
   // Global Socket Connection & Background Sync
   useEffect(() => {

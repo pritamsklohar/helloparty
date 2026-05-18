@@ -51,6 +51,25 @@ const broadcastSeatsUpdated = (io, roomId, room) => {
   });
 };
 
+const syncSeatsToDb = async (roomId, room) => {
+  try {
+    const dbSeats = {
+      seat1: room.seats[0] ? room.seats[0].uid : null,
+      seat2: room.seats[1] ? room.seats[1].uid : null,
+      seat3: room.seats[2] ? room.seats[2].uid : null,
+      seat4: room.seats[3] ? room.seats[3].uid : null,
+      seat5: room.seats[4] ? room.seats[4].uid : null,
+      seat6: room.seats[5] ? room.seats[5].uid : null,
+      seat7: room.seats[6] ? room.seats[6].uid : null,
+      seat8: room.seats[7] ? room.seats[7].uid : null
+    };
+    await Room.findByIdAndUpdate(roomId, { seats: dbSeats });
+    console.log(`Synced seats for room ${roomId} to DB`);
+  } catch (err) {
+    console.error(`Failed to sync seats for room ${roomId} to DB:`, err.message);
+  }
+};
+
 const voiceRoomHandler = (io, socket) => {
 
   // 1. Join Room & Initialize Unified State
@@ -79,16 +98,54 @@ const voiceRoomHandler = (io, socket) => {
         // Look up room in DB to resolve actual host
         let dbRoom = null;
         try {
-          dbRoom = await Room.findById(roomId).populate('host');
+          dbRoom = await Room.findById(roomId);
         } catch (dbErr) {
           console.warn("DB Room look up failed:", dbErr.message);
+        }
+
+        const seats = Array(8).fill(null);
+        if (dbRoom && dbRoom.seats) {
+          const uidsToFetch = [];
+          for (let i = 1; i <= 8; i++) {
+            const uidVal = dbRoom.seats[`seat${i}`];
+            if (uidVal) uidsToFetch.push(uidVal);
+          }
+          if (uidsToFetch.length > 0) {
+            try {
+              const dbUsers = await User.find({ uid: { $in: uidsToFetch } });
+              const seatedUsersMap = new Map(dbUsers.map(u => [u.uid, u]));
+              for (let i = 0; i < 8; i++) {
+                const uidVal = dbRoom.seats[`seat${i + 1}`];
+                if (uidVal && seatedUsersMap.has(uidVal)) {
+                  const dbU = seatedUsersMap.get(uidVal);
+                  seats[i] = {
+                    id: dbU.uid, // Use their uid as fallback socket ID until they join
+                    userId: dbU._id.toString(),
+                    uid: dbU.uid,
+                    name: dbU.username,
+                    handle: dbU.username,
+                    avatar: dbU.avatarUrl || '👤',
+                    role: 'user',
+                    status: 'seated',
+                    seat: i + 1,
+                    muted: false,
+                    selfMuted: false,
+                    lifted: false,
+                    joinedAt: Date.now()
+                  };
+                }
+              }
+            } catch (fetchErr) {
+              console.error("Failed to populate seated users from DB:", fetchErr.message);
+            }
+          }
         }
 
         room = {
           roomId,
           roomName: dbRoom ? dbRoom.name : "Voice Room",
           owner: null,
-          seats: Array(8).fill(null), // Seats 1-8
+          seats, // Pre-populated seats 1-8
           waitingList: [],
           activeMembers: 0,
           createdAt: Date.now(),
@@ -131,6 +188,7 @@ const voiceRoomHandler = (io, socket) => {
           if (room.seats[i] && room.seats[i].handle === user.username) {
             existingUser = room.seats[i];
             existingUser.id = socket.id;
+            existingUser.status = 'seated';
             break;
           }
         }
@@ -154,11 +212,6 @@ const voiceRoomHandler = (io, socket) => {
       }
 
       if (!existingUser) {
-        // Determine role: if owner is not yet assigned, first to join (or matching dbRoom host) is owner
-        const dbRoom = await Room.findById(roomId).catch(() => null);
-        const isDbHost = dbRoom && dbRoom.host && dbRoom.host.toString() === user.userId;
-        const isOwnerUser = room.owner === null && (isDbHost || room.activeMembers === 0);
-
         // Fetch actual UID from Mongo if frontend failed to provide it
         let actualUid = user.uid;
         if ((!actualUid || actualUid === socket.id) && user.userId) {
@@ -167,6 +220,11 @@ const voiceRoomHandler = (io, socket) => {
             actualUid = dbUser.uid;
           }
         }
+
+        // Determine role: if owner is not yet assigned, first to join (or matching dbRoom host) is owner
+        const dbRoom = await Room.findById(roomId).catch(() => null);
+        const isDbHost = dbRoom && dbRoom.host && dbRoom.host.toString() === actualUid;
+        const isOwnerUser = room.owner === null && (isDbHost || room.activeMembers === 0);
 
         const newUser = {
           id: socket.id,
@@ -188,6 +246,15 @@ const voiceRoomHandler = (io, socket) => {
           newUser.status = 'seated';
           newUser.seat = 0;
           room.owner = newUser;
+          
+          // Remove owner's uid from any seats
+          for (let i = 0; i < 8; i++) {
+            if (room.seats[i] && room.seats[i].uid === actualUid) {
+              room.seats[i] = null;
+            }
+          }
+          await syncSeatsToDb(roomId, room);
+          
           addRoomLog(room, `${user.username} created/entered the room as owner.`);
         } else {
           // ALWAYS place non-owners on the waiting list upon room entry
@@ -315,6 +382,15 @@ const voiceRoomHandler = (io, socket) => {
       user.seat = seatIndex + 1;
       room.seats[seatIndex] = user;
 
+      // Remove this user from any other seats
+      for (let i = 0; i < 8; i++) {
+        if (i !== seatIndex && room.seats[i] && room.seats[i].uid === user.uid) {
+          room.seats[i] = null;
+        }
+      }
+
+      await syncSeatsToDb(roomId, room);
+
       addRoomLog(room, `${user.name} sat down in seat ${seatIndex + 1}.`);
       updateActiveMembersCount(room, roomId, io);
 
@@ -344,6 +420,8 @@ const voiceRoomHandler = (io, socket) => {
         user.status = 'waiting';
         user.seat = null;
         room.waitingList.push(user);
+
+        await syncSeatsToDb(roomId, room);
 
         addRoomLog(room, `${user.name} stood up from seat.`);
         updateActiveMembersCount(room, roomId, io);
@@ -434,6 +512,8 @@ const voiceRoomHandler = (io, socket) => {
         targetUser.status = 'waiting';
         targetUser.seat = null;
         room.waitingList.push(targetUser);
+
+        await syncSeatsToDb(roomId, room);
 
         addRoomLog(room, `${room.owner.name} stood up ${targetUser.name} from seat.`);
         updateActiveMembersCount(room, roomId, io);
@@ -601,7 +681,8 @@ const voiceRoomHandler = (io, socket) => {
             // Promote to owner in DB!
             try {
               const Room = require('../models/Room');
-              await Room.findByIdAndUpdate(roomId, { host: newOwnerCandidate.userId });
+              await Room.findByIdAndUpdate(roomId, { host: newOwnerCandidate.uid });
+              await syncSeatsToDb(roomId, currentRoom);
               console.log(`Updated room ${roomId} host to ${newOwnerCandidate.name} in DB (delayed)`);
             } catch (err) {
               console.error("Failed to update room host in DB after promotion (delayed):", err.message);
@@ -684,7 +765,8 @@ const voiceRoomHandler = (io, socket) => {
           // Promote to owner in DB!
           try {
             const Room = require('../models/Room');
-            await Room.findByIdAndUpdate(roomId, { host: newOwnerCandidate.userId });
+            await Room.findByIdAndUpdate(roomId, { host: newOwnerCandidate.uid });
+            await syncSeatsToDb(roomId, room);
             console.log(`Updated room ${roomId} host to ${newOwnerCandidate.name} in DB (immediate)`);
           } catch (err) {
             console.error("Failed to update room host in DB after promotion (immediate):", err.message);
@@ -710,6 +792,7 @@ const voiceRoomHandler = (io, socket) => {
         if (room.seats[i] && room.seats[i].id === socketId) {
           exitedUser = room.seats[i];
           room.seats[i] = null;
+          await syncSeatsToDb(roomId, room);
           break;
         }
       }

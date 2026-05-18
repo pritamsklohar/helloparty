@@ -16,8 +16,7 @@ const roomSchema = new mongoose.Schema({
     default: 'voice',
   },
   host: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: String, // 9-digit unique user UID
     required: true,
   },
   isPrivate: {
@@ -31,10 +30,16 @@ const roomSchema = new mongoose.Schema({
     type: Number,
     default: 8,
   },
-  members: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  seats: {
+    seat1: { type: String, default: null },
+    seat2: { type: String, default: null },
+    seat3: { type: String, default: null },
+    seat4: { type: String, default: null },
+    seat5: { type: String, default: null },
+    seat6: { type: String, default: null },
+    seat7: { type: String, default: null },
+    seat8: { type: String, default: null }
+  },
   status: {
     type: String,
     enum: ['active', 'closed'],
