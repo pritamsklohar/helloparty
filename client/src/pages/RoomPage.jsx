@@ -107,10 +107,10 @@ const RoomPage = () => {
 
     // 2. Initialize WebRTC & Socket (with listener re-binding support)
     const initWebRTC = async () => {
-      const isAlreadyInRoom = socketRef.current && socketRef.current.connected && activeRoom && activeRoom._id === id;
+      const isAlreadyInRoom = !!(socketRef.current && socketRef.current.connected);
 
-      if (isInitializingRef.current) return;
       if (!isAlreadyInRoom) {
+        if (isInitializingRef.current) return;
         isInitializingRef.current = true;
       }
 
