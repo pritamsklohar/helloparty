@@ -1,7 +1,54 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
 
-const onlineUsers = new Map(); // userId -> socketId
+const onlineUsers = new Map(); // userId -> Set of socketIds
+
+const registerUserOnline = async (io, userId, socketId) => {
+  if (!userId || userId === 'null' || userId === 'undefined') return;
+
+  if (!onlineUsers.has(userId)) {
+    onlineUsers.set(userId, new Set());
+  }
+  
+  const sockets = onlineUsers.get(userId);
+  const wasOffline = sockets.size === 0;
+  sockets.add(socketId);
+
+  if (wasOffline) {
+    // Set isOnline in Mongo
+    try {
+      await User.findByIdAndUpdate(userId, { isOnline: true });
+    } catch (err) {
+      console.error(`Error marking user ${userId} online:`, err.message);
+    }
+    // Broadcast that this user is online to everyone
+    io.emit('user_status_change', { userId, status: 'online' });
+    console.log(`User ${userId} is online (sockets active: ${sockets.size})`);
+  }
+};
+
+const unregisterUserOffline = async (io, userId, socketId) => {
+  if (!userId) return;
+
+  const sockets = onlineUsers.get(userId);
+  if (sockets) {
+    sockets.delete(socketId);
+    if (sockets.size === 0) {
+      onlineUsers.delete(userId);
+      // Set isOnline to false in Mongo
+      try {
+        await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
+      } catch (err) {
+        console.error(`Error marking user ${userId} offline:`, err.message);
+      }
+      // Broadcast that this user is offline to everyone
+      io.emit('user_status_change', { userId, status: 'offline' });
+      console.log(`User ${userId} is offline (all sockets closed)`);
+    } else {
+      console.log(`Socket ${socketId} disconnected for user ${userId}. Still online via ${sockets.size} active socket(s).`);
+    }
+  }
+};
 
 const chatHandler = (io, socket) => {
   // Join personal room based on user ID
@@ -13,24 +60,21 @@ const chatHandler = (io, socket) => {
 
     socket.join(`user_${userId}`);
     socket.userId = userId;
-    onlineUsers.set(userId, socket.id);
-    
-    // Set isOnline in Mongo
-    try {
-      await User.findByIdAndUpdate(userId, { isOnline: true });
-    } catch (err) {
-      console.error(`Error marking user ${userId} online:`, err.message);
+    await registerUserOnline(io, userId, socket.id);
+  });
+
+  // Listen also to voice room joining to keep online status perfectly synced
+  socket.on('peer:join_room', async ({ roomId, user }) => {
+    if (user && user.userId) {
+      socket.userId = user.userId;
+      await registerUserOnline(io, user.userId, socket.id);
     }
-    
-    // Broadcast that this user is online to everyone
-    io.emit('user_status_change', { userId, status: 'online' });
-    console.log(`User ${userId} is online`);
   });
 
   // Check if a user is online
   socket.on('check_online_status', (userId) => {
     if (!userId) return;
-    const isOnline = onlineUsers.has(userId);
+    const isOnline = onlineUsers.has(userId) && onlineUsers.get(userId).size > 0;
     socket.emit('user_status_res', { userId, isOnline });
   });
 
@@ -161,17 +205,7 @@ const chatHandler = (io, socket) => {
   // Handle disconnection
   socket.on('disconnect', async () => {
     if (socket.userId) {
-      onlineUsers.delete(socket.userId);
-      
-      // Set isOnline to false in Mongo
-      try {
-        await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
-      } catch (err) {
-        console.error(`Error marking user ${socket.userId} offline:`, err.message);
-      }
-
-      io.emit('user_status_change', { userId: socket.userId, status: 'offline' });
-      console.log(`User ${socket.userId} went offline`);
+      await unregisterUserOffline(io, socket.userId, socket.id);
     }
   });
 };
