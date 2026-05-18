@@ -16,11 +16,8 @@ const VoicePage = () => {
   const [roomName, setRoomName] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [password, setPassword] = useState('');
-  const category = 'voice'; // 'voice' only for now
-  const [isLoading, setIsLoading] = useState(false);
-  const [rooms, setRooms] = useState([]);
-  const [fetchingRooms, setFetchingRooms] = useState(true);
-
+  const [createCategory, setCreateCategory] = useState('voice');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchRooms = async () => {
@@ -72,10 +69,13 @@ const VoicePage = () => {
     };
   }, []);
 
-  const filteredRooms = rooms.filter(room => 
-    room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    room.host?.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredRooms = rooms.filter(room => {
+    const matchesSearch = room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      room.host?.username?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (selectedCategory === 'All') return matchesSearch;
+    return matchesSearch && room.category === selectedCategory;
+  });
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
@@ -90,7 +90,7 @@ const VoicePage = () => {
     try {
       const res = await api.post('/rooms', {
         name: roomName.trim(),
-        category,
+        category: createCategory,
         isPrivate: hasPassword,
         password: hasPassword ? password : ''
       });
@@ -107,27 +107,47 @@ const VoicePage = () => {
   return (
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-bg relative">
       {/* Transparent Header */}
-      <header className="absolute top-0 left-0 right-0 z-40 px-4 py-4 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent">
-        <div className="flex-1 max-w-md relative">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg drop-shadow-md z-10" />
-          <input 
-            type="text" 
-            placeholder="Search by room name or host..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full py-2.5 pl-12 pr-4 focus:outline-none focus:bg-white/20 focus:border-white/40 transition-all text-sm placeholder:text-white/70 shadow-inner"
-          />
+      <header className="absolute top-0 left-0 right-0 z-40 px-4 py-4 flex flex-col gap-3.5 bg-gradient-to-b from-black/90 via-black/60 to-transparent">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex-1 max-w-md relative">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg drop-shadow-md z-10" />
+            <input 
+              type="text" 
+              placeholder="Search by room name or host..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full py-2.5 pl-12 pr-4 focus:outline-none focus:bg-white/20 focus:border-white/40 transition-all text-sm placeholder:text-white/70 shadow-inner"
+            />
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="ml-4 w-11 h-11 rounded-full bg-primary/90 backdrop-blur-md flex items-center justify-center text-white hover:bg-primaryHover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/30 flex-shrink-0"
+          >
+            <FiPlus className="text-2xl" />
+          </button>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="ml-4 w-11 h-11 rounded-full bg-primary/90 backdrop-blur-md flex items-center justify-center text-white hover:bg-primaryHover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/30"
-        >
-          <FiPlus className="text-2xl" />
-        </button>
+
+        {/* Categories Row (Raw format) */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-0.5">
+          {['All', 'voice', 'video', 'game'].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-5 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase transition-all duration-300 border flex-shrink-0
+                ${selectedCategory === cat 
+                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105' 
+                  : 'bg-white/5 text-white/60 border-white/5 hover:bg-white/10 hover:text-white'
+                }
+              `}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* Main Content Area (Room List) */}
-      <main className="flex-1 overflow-y-auto pt-24 pb-24 px-4 scrollbar-hide">
+      <main className="flex-1 overflow-y-auto pt-36 pb-24 px-4 scrollbar-hide">
         {fetchingRooms ? (
           <div className="flex flex-col items-center justify-center h-48 opacity-50">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -178,7 +198,7 @@ const VoicePage = () => {
 
                 <div className="mt-4 flex items-center gap-2">
                   <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-[10px] font-bold tracking-wider uppercase">
-                    Voice
+                    {room.category || 'voice'}
                   </span>
                   {room.isPrivate && (
                     <FiLock className="text-white/30 text-xs" />
@@ -223,7 +243,27 @@ const VoicePage = () => {
               </div>
 
               <form onSubmit={handleCreateRoom} className="p-6 space-y-6">
-                {/* Removed Category Selection */}
+                {/* Category Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-2">Category</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {['voice', 'video', 'game'].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCreateCategory(cat)}
+                        className={`py-2.5 rounded-xl text-xs font-bold tracking-wide uppercase transition-all duration-300 border
+                          ${createCategory === cat 
+                            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]' 
+                            : 'bg-surfaceAlt border-white/5 text-white/60 hover:bg-white/5 hover:text-white'
+                          }
+                        `}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Room Name */}
                 <div>
