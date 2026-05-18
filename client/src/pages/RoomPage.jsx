@@ -626,26 +626,6 @@ const RoomPage = () => {
               className="w-full h-full rounded-full object-cover bg-surfaceAlt relative z-10" 
             />
             
-            {/* If I am the host, use local VAD */}
-            {isHostMe ? (
-              <AudioStream 
-                stream={localStreamRef.current} 
-                micEnabled={!isMuted}
-                muted={true} 
-                onSpeaking={(speaking) => handleSpeakingUpdate(myUserId.current, speaking)}
-              />
-            ) : (
-              /* If I am a guest, find host peer stream */
-              hostSocketId && peersRef.current.get(hostSocketId)?.stream && (
-                <AudioStream 
-                  stream={peersRef.current.get(hostSocketId).stream} 
-                  micEnabled={!mutedPeers.has(hostSocketId)}
-                  muted={isSpeakerOff} 
-                  onSpeaking={(speaking) => handleSpeakingUpdate(hostSocketId, speaking)}
-                />
-              )
-            )}
-            
             <div className="absolute -bottom-1 -right-1 bg-[#8e44ad] text-[10px] px-1.5 rounded-full text-white font-bold border border-white/20">OWNER</div>
           </div>
           <div className={`text-xs font-bold mt-2 transition-colors ${activeSpeakerId === hostSocketId ? 'text-primary' : 'text-white/90'}`}>
@@ -699,23 +679,6 @@ const RoomPage = () => {
                         alt="User"
                         className="w-full h-full object-cover rounded-full relative z-10"
                       />
-                      {isMe ? (
-                        <AudioStream 
-                          stream={localStreamRef.current} 
-                          micEnabled={!isMuted}
-                          muted={true} 
-                          onSpeaking={(speaking) => handleSpeakingUpdate(myUserId.current, speaking)}
-                        />
-                      ) : (
-                        peerData?.stream && (
-                          <AudioStream 
-                            stream={peerData.stream} 
-                            micEnabled={!isMutedRemote}
-                            muted={isSpeakerOff} 
-                            onSpeaking={(speaking) => handleSpeakingUpdate(userId, speaking)}
-                          />
-                        )
-                      )}
                       {isMe && (
                         <div className="absolute -top-1 -right-1 bg-primary text-[8px] px-1 rounded-full text-white font-bold">YOU</div>
                       )}
@@ -975,85 +938,5 @@ const injectStyles = () => {
   document.head.appendChild(style);
 };
 injectStyles();
-
-// Helper component to play remote audio streams with Voice Activity Detection
-const AudioStream = ({ stream, muted, onSpeaking, micEnabled }) => {
-  const audioRef = useRef();
-  const timeoutRef = useRef(null);
-  const speakingRef = useRef(false);
-
-  useEffect(() => {
-    if (audioRef.current && stream) {
-      audioRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  useEffect(() => {
-    if (!stream || !micEnabled) {
-      if (speakingRef.current) {
-        speakingRef.current = false;
-        onSpeaking(false);
-      }
-      return;
-    }
-
-    let audioContext, analyser, source, dataArray, animationId;
-
-    const setupAudio = () => {
-      try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        source = audioContext.createMediaStreamSource(stream);
-        source.connect(analyser);
-        analyser.fftSize = 256;
-        const bufferLength = analyser.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
-
-        const checkSpeaking = () => {
-          analyser.getByteFrequencyData(dataArray);
-          let values = 0;
-          for (let i = 0; i < bufferLength; i++) {
-            values += dataArray[i];
-          }
-          const average = values / bufferLength;
-          const currentlySpeaking = average > 20; // Increased threshold to 20 for solid detection
-
-          if (currentlySpeaking) {
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
-            }
-            if (!speakingRef.current) {
-              speakingRef.current = true;
-              onSpeaking(true);
-            }
-          } else if (speakingRef.current) {
-            if (!timeoutRef.current) {
-              timeoutRef.current = setTimeout(() => {
-                speakingRef.current = false;
-                onSpeaking(false);
-                timeoutRef.current = null;
-              }, 300); // 300ms smoothing delay
-            }
-          }
-          animationId = requestAnimationFrame(checkSpeaking);
-        };
-        checkSpeaking();
-      } catch (err) {
-        console.error('Audio Setup Error:', err);
-      }
-    };
-
-    setupAudio();
-
-    return () => {
-      if (animationId) cancelAnimationFrame(animationId);
-      if (audioContext) audioContext.close();
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [stream, micEnabled]);
-
-  return <audio ref={audioRef} autoPlay muted={muted} className="hidden" />;
-};
 
 export default RoomPage;

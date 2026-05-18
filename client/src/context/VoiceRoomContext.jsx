@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef } from 'react';
+import { createContext, useContext, useState, useRef, useEffect } from 'react';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 
@@ -142,8 +142,130 @@ export const VoiceRoomProvider = ({ children }) => {
       restoreRoom 
     }}>
       {children}
+      
+      {/* PERSISTENT AUDIO ELEMENTS WRAPPED GLOBALLY TO PREVENT UNMOUNT/DISCONNECT ON MINIMIZE */}
+      <div className="hidden">
+        {/* Play local mic for VAD if active */}
+        {localStreamRef.current && (
+          <AudioStream 
+            stream={localStreamRef.current} 
+            micEnabled={!isMuted}
+            muted={true} 
+            onSpeaking={(speaking) => {
+              if (speaking) {
+                setActiveSpeakerId(myUserId.current);
+              } else if (activeSpeakerId === myUserId.current) {
+                setActiveSpeakerId(null);
+              }
+            }}
+          />
+        )}
+        
+        {/* Play all remote streams */}
+        {remotePeers.map(socketId => {
+          const peerData = peersRef.current.get(socketId);
+          if (peerData && peerData.stream) {
+            return (
+              <AudioStream 
+                key={socketId}
+                stream={peerData.stream} 
+                micEnabled={!mutedPeers.has(socketId)}
+                muted={isSpeakerOff} 
+                onSpeaking={(speaking) => {
+                  if (speaking) {
+                    setActiveSpeakerId(socketId);
+                  } else if (activeSpeakerId === socketId) {
+                    setActiveSpeakerId(null);
+                  }
+                }}
+              />
+            );
+          }
+          return null;
+        })}
+      </div>
     </VoiceRoomContext.Provider>
   );
+};
+
+// Helper component to play remote audio streams with Voice Activity Detection
+const AudioStream = ({ stream, muted, onSpeaking, micEnabled }) => {
+  const audioRef = useRef();
+  const timeoutRef = useRef(null);
+  const speakingRef = useRef(false);
+
+  useEffect(() => {
+    if (audioRef.current && stream) {
+      audioRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  useEffect(() => {
+    if (!stream || !micEnabled) {
+      if (speakingRef.current) {
+        speakingRef.current = false;
+        onSpeaking(false);
+      }
+      return;
+    }
+
+    let audioContext, analyser, source, dataArray, animationId;
+
+    const setupAudio = () => {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+
+        const checkSpeaking = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let values = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            values += dataArray[i];
+          }
+          const average = values / bufferLength;
+          const currentlySpeaking = average > 20;
+
+          if (currentlySpeaking) {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+            if (!speakingRef.current) {
+              speakingRef.current = true;
+              onSpeaking(true);
+            }
+          } else if (speakingRef.current) {
+            if (!timeoutRef.current) {
+              timeoutRef.current = setTimeout(() => {
+                speakingRef.current = false;
+                onSpeaking(false);
+                timeoutRef.current = null;
+              }, 300);
+            }
+          }
+          animationId = requestAnimationFrame(checkSpeaking);
+        };
+        checkSpeaking();
+      } catch (err) {
+        console.error('Audio Setup Error:', err);
+      }
+    };
+
+    setupAudio();
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (audioContext) audioContext.close();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [stream, micEnabled]);
+
+  return <audio ref={audioRef} autoPlay muted={muted} className="hidden" />;
 };
 
 export const useVoiceRoom = () => {
