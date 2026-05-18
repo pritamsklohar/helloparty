@@ -137,7 +137,7 @@ const VoicePage = () => {
         </div>
 
         {/* Categories Horizontal Row */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="w-full flex items-center gap-2 overflow-x-auto pb-2 pt-1 scrollbar-none scroll-smooth" style={{ WebkitOverflowScrolling: 'touch' }}>
           {['All', 'voice', 'video', 'game'].map((cat) => {
             const isActive = selectedCategory === cat;
             return (
