@@ -7,16 +7,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#F8FAFC',
-        surface: '#FFFFFF',
-        surfaceAlt: '#F1F5F9',
-        primary: '#7C3AED',
-        primaryHover: '#6D28D9',
-        secondary: '#EF4444',
-        accent: '#F59E0B',
-        success: '#10B981',
-        muted: '#64748B',
-        border: '#E2E8F0',
+        bg: '#0F0F1A',
+        surface: '#1A1A2E',
+        surfaceAlt: '#16213E',
+        primary: '#7C5CBF',
+        primaryHover: '#6B4DAE',
+        secondary: '#E05C5C',
+        accent: '#F4A261',
+        success: '#2ECC71',
+        muted: '#A0A0B0',
+        border: '#2A2A3E',
       },
       fontFamily: {
         sans: ['Poppins', 'sans-serif'],

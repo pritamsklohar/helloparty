@@ -4,211 +4,23 @@
 
 @layer base {
   html, body {
-    background-color: #F8FAFC !important;
-    color: #0F172A !important;
-    font-family: 'Poppins', 'sans-serif';
+    @apply bg-bg text-white/90 font-sans;
     scroll-behavior: smooth;
   }
 }
 
-/* ==========================================================================
-   GLOBAL PREMIUM LIGHT THEME OVERRIDES
-   Redesigns all pages instantly without touching JSX logic.
-   ========================================================================== */
-
-/* 1. Global Backgrounds & Cards Redesign */
-.bg-bg,
-.bg-slate-950,
-.bg-slate-900,
-.bg-zinc-950,
-.bg-zinc-900,
-.bg-neutral-950,
-.bg-neutral-900,
-.bg-black\/20,
-.bg-black\/30,
-.bg-black\/40,
-.bg-black\/50,
-.bg-black\/60,
-.bg-white\/5,
-.bg-white\/10 {
-  background-color: #FFFFFF !important;
-  background-image: none !important;
-  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.08), 0 2px 8px -1px rgba(148, 163, 184, 0.04) !important;
-}
-
-/* Inset / Section backgrounds */
-.bg-surfaceAlt,
-.bg-slate-800,
-.bg-zinc-800,
-.bg-neutral-800,
-.bg-slate-900\/50,
-.bg-zinc-950\/50 {
-  background-color: #F1F5F9 !important;
-  box-shadow: none !important;
-}
-
-/* 2. Text Elements & Visibility Controls */
-h1, h2, h3, h4, h5, h6,
-.text-white,
-.text-white\/90,
-.text-white\/80,
-.text-white\/70,
-.text-slate-100,
-.text-slate-200,
-.text-slate-300,
-.text-slate-400,
-.text-zinc-100,
-.text-zinc-200,
-.text-zinc-300,
-.text-zinc-400,
-.text-neutral-100,
-.text-neutral-200,
-.text-neutral-300 {
-  color: #0F172A !important;
-}
-
-/* Secondary / Muted Texts */
-p,
-span:not(.bg-primary):not(.bg-green-500):not(.bg-red-500):not(.bg-blue-500):not(.bg-amber-500),
-.text-white\/60,
-.text-white\/50,
-.text-white\/40,
-.text-white\/30,
-.text-slate-500,
-.text-zinc-500,
-.text-neutral-500 {
-  color: #475569 !important;
-}
-
-/* 3. Global Border Overrides */
-.border,
-.border-border,
-.border-white\/10,
-.border-white\/20,
-.border-slate-800,
-.border-zinc-800,
-.border-neutral-800,
-.border-slate-900\/20 {
-  border-color: #E2E8F0 !important;
-}
-
-/* 4. Form Inputs & Textareas */
-input[type="text"],
-input[type="password"],
-input[type="email"],
-textarea,
-select {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
-  border: 1px solid #CBD5E1 !important;
-  box-shadow: inset 0 1px 2px rgba(148, 163, 184, 0.05) !important;
-}
-input[type="text"]:focus,
-input[type="password"]:focus,
-input[type="email"]:focus,
-textarea:focus,
-select:focus {
-  border-color: #7C3AED !important;
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
-}
-input::placeholder,
-textarea::placeholder {
-  color: #94A3B8 !important;
-  opacity: 0.8 !important;
-}
-
-/* 5. CTA Elements & Badges Protection (Must stay bright white text/icons) */
-button,
-.btn,
-.bg-primary,
-.bg-primaryHover,
-.bg-gradient-to-r,
-.bg-green-500,
-.bg-green-600,
-.bg-red-500,
-.bg-red-600,
-.bg-blue-500,
-.bg-blue-600,
-.bg-amber-500,
-.bg-amber-600,
-.bg-\[\#8e44ad\] {
-  color: #FFFFFF !important;
-  background-image: none; /* Keep gradients disabled or custom */
-}
-
-/* Keep text/icons inside buttons/CTAs white */
-button *,
-.btn *,
-.bg-primary *,
-.bg-gradient-to-r *,
-.bg-green-500 *,
-.bg-red-500 *,
-.bg-blue-500 *,
-.bg-amber-500 * {
-  color: #FFFFFF !important;
-}
-
-/* 6. Message & Chat Bubbles Tuning */
-/* Incoming Message Bubble Override */
-.bg-slate-900\/40,
-.bg-slate-800\/60,
-.bg-zinc-900\/40 {
-  background-color: #F1F5F9 !important;
-  border-color: #E2E8F0 !important;
-}
-.bg-slate-900\/40 *,
-.bg-slate-800\/60 *,
-.bg-zinc-900\/40 * {
-  color: #0F172A !important;
-}
-
-/* Outgoing Message Bubble Override */
-.bg-primary {
-  background-color: #7C3AED !important;
-}
-.bg-primary * {
-  color: #FFFFFF !important;
-}
-
-/* 7. Modals & Overlays Glassmorphism */
-.fixed.inset-0.bg-black\/60,
-.fixed.inset-0.bg-black\/80 {
-  background-color: rgba(15, 23, 42, 0.3) !important;
-  backdrop-filter: blur(8px) !important;
-}
-
-.shadow-2xl {
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.08) !important;
-}
-
-/* 8. Bottom & Top Navigation Insets */
-.fixed.bottom-0,
-.sticky.top-0,
-.bg-surface\/80 {
-  background-color: rgba(255, 255, 255, 0.9) !important;
-  backdrop-filter: blur(12px) !important;
-  border-color: #F1F5F9 !important;
-  box-shadow: 0 -4px 12px -2px rgba(15, 23, 42, 0.03) !important;
-}
-
-/* Custom scrollbar styling */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background-color: #F1F5F9 !important;
+  @apply bg-surface;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(124, 92, 191, 0.25) !important;
-  border-radius: 9999px !important;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(124, 92, 191, 0.45) !important;
+  @apply bg-primary rounded-full;
 }
 
-/* Selection highlight */
+/* Selection */
 ::selection {
-  background-color: rgba(124, 58, 237, 0.15) !important;
-  color: #7C3AED !important;
+  @apply bg-primary text-white;
 }

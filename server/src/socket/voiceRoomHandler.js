@@ -189,6 +189,7 @@ const voiceRoomHandler = (io, socket) => {
             existingUser = room.seats[i];
             existingUser.id = socket.id;
             existingUser.status = 'seated';
+            existingUser.disconnected = false;
             break;
           }
         }
@@ -790,6 +791,13 @@ const voiceRoomHandler = (io, socket) => {
       // Check seated users
       for (let i = 0; i < 8; i++) {
         if (room.seats[i] && room.seats[i].id === socketId) {
+          if (isSuddenDisconnect) {
+            // Keep them seated! Just mark as disconnected (in-memory)
+            room.seats[i].disconnected = true;
+            room.seats[i].disconnectedAt = Date.now();
+            console.log(`Seated user ${room.seats[i].name} marked disconnected (sudden)`);
+            return;
+          }
           exitedUser = room.seats[i];
           room.seats[i] = null;
           await syncSeatsToDb(roomId, room);
