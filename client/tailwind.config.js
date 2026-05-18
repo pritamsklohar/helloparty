@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#F5F7FB',
+        bg: '#F8FAFC',
         surface: '#FFFFFF',
-        surfaceAlt: '#EEF2F6',
+        surfaceAlt: '#F1F5F9',
         primary: '#7C3AED',
         primaryHover: '#6D28D9',
         secondary: '#EF4444',
@@ -17,7 +17,6 @@ export default {
         success: '#10B981',
         muted: '#64748B',
         border: '#E2E8F0',
-        white: '#1E293B', // Redefine white to be dark slate in the light theme!
       },
       fontFamily: {
         sans: ['Poppins', 'sans-serif'],
