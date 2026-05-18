@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
+import useAuthStore from './authStore';
 
 const useChatStore = create((set, get) => ({
   conversations: [],
@@ -208,7 +209,13 @@ const useChatStore = create((set, get) => ({
             ...conv,
             lastMessage: message.text || message.content || '',
             lastMessageTime: message.createdAt || new Date().toISOString(),
-            unreadCount: (isActive || message.isOwn || message.sender === get().conversations.find(c => c._id === chatId)?.uid) ? 0 : (conv.unreadCount || 0) + 1
+            unreadCount: (
+              isActive || 
+              message.isOwn || 
+              message.sender === useAuthStore.getState().user?._id ||
+              message.sender === useAuthStore.getState().user?.id ||
+              message.sender === get().conversations.find(c => c._id === chatId)?.uid
+            ) ? 0 : (conv.unreadCount || 0) + 1
           };
         }
         return conv;
