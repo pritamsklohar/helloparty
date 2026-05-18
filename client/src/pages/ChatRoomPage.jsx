@@ -207,7 +207,7 @@ const ChatRoomPage = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-bg relative overflow-hidden">
+    <div className="fixed inset-0 flex flex-col h-[100dvh] bg-bg overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-4 bg-surfaceAlt/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50">
         <div className="flex items-center gap-3">

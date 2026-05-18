@@ -565,7 +565,7 @@ const RoomPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-bg overflow-hidden relative">
+    <div className="fixed inset-0 flex flex-col h-[100dvh] bg-bg overflow-hidden">
       {/* Dynamic background effect */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-30 z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 blur-[100px] rounded-full mix-blend-screen animate-pulse-ring"></div>
