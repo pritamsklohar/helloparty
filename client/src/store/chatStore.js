@@ -13,6 +13,13 @@ const useChatStore = create((set, get) => ({
   loadingMessages: {},
   loadingUsers: {},
   loadingGroups: {},
+  mutedChatIds: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('mutedChatIds') || '[]');
+    } catch {
+      return [];
+    }
+  })(),
 
   // Fetch individual user detail with cache support
   fetchUserDetail: async (uid, silent = false) => {
@@ -241,6 +248,19 @@ const useChatStore = create((set, get) => ({
         return conv;
       })
     }));
+  },
+
+  // Toggle mute status for direct user or group conversation
+  toggleMuteChat: (chatId) => {
+    set((state) => {
+      const isMuted = state.mutedChatIds.includes(chatId);
+      const updated = isMuted
+        ? state.mutedChatIds.filter((id) => id !== chatId)
+        : [...state.mutedChatIds, chatId];
+      
+      localStorage.setItem('mutedChatIds', JSON.stringify(updated));
+      return { mutedChatIds: updated };
+    });
   }
 }));
 

@@ -30,7 +30,9 @@ const ChatRoomPage = () => {
     clearUnreadCount,
     usersCache,
     loadingUsers,
-    fetchUserDetail
+    fetchUserDetail,
+    mutedChatIds,
+    toggleMuteChat
   } = useChatStore();
 
   const user = usersCache[uid] || null;
@@ -246,8 +248,20 @@ const ChatRoomPage = () => {
                     <button onClick={() => { setShowOptions(false); navigate(`/user/${user.uid}`); }} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
                       <FiUser className="text-lg text-primary" /> View Profile
                     </button>
-                    <button onClick={() => setShowOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
-                      <FiBellOff className="text-lg text-yellow-400" /> Mute Chat
+                    <button 
+                      onClick={() => {
+                        toggleMuteChat(user._id);
+                        setShowOptions(false);
+                        if (mutedChatIds.includes(user._id)) {
+                          toast.success('Chat unmuted');
+                        } else {
+                          toast.success('Chat muted');
+                        }
+                      }} 
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left"
+                    >
+                      <FiBellOff className={`text-lg ${mutedChatIds.includes(user._id) ? 'text-white/40' : 'text-yellow-400'}`} />
+                      {mutedChatIds.includes(user._id) ? 'Unmute Chat' : 'Mute Chat'}
                     </button>
                     <button onClick={() => setShowOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-white/10 rounded-xl transition-colors text-left">
                       <FiSlash className="text-lg" /> Block User

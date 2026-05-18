@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiChevronLeft, FiSend, FiUsers, FiInfo, FiMoreVertical, FiLogOut, FiTrash2 } from 'react-icons/fi';
+import { FiChevronLeft, FiSend, FiUsers, FiInfo, FiMoreVertical, FiLogOut, FiTrash2, FiBellOff } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import useChatStore from '../store/chatStore';
 import { socket } from '../services/socket';
@@ -20,7 +21,9 @@ const GroupChatPage = () => {
     fetchGroupHistory,
     groupsCache,
     loadingGroups,
-    fetchGroupDetail
+    fetchGroupDetail,
+    mutedChatIds,
+    toggleMuteChat
   } = useChatStore();
 
   const group = groupsCache[id] || null;
@@ -122,12 +125,18 @@ const GroupChatPage = () => {
                   </button>
                   <button 
                     onClick={() => {
+                      toggleMuteChat(id);
                       setShowMenu(false);
-                      toast('Muting coming soon!');
+                      if (mutedChatIds.includes(id)) {
+                        toast.success('Group unmuted');
+                      } else {
+                        toast.success('Group muted');
+                      }
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/90 hover:bg-white/5 rounded-xl transition-colors text-left"
                   >
-                    <FiLogOut size={18} className="text-accent rotate-180" /> Mute Group
+                    <FiBellOff size={18} className={mutedChatIds.includes(id) ? 'text-white/40' : 'text-yellow-400'} />
+                    {mutedChatIds.includes(id) ? 'Unmute Group' : 'Mute Group'}
                   </button>
                   {isOwner && (
                     <button 

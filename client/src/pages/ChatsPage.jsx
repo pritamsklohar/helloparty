@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSearch, FiPlus, FiUserPlus, FiUsers, FiList, FiMessageSquare, FiX } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiUserPlus, FiUsers, FiList, FiMessageSquare, FiX, FiBellOff } from 'react-icons/fi';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import useChatStore from '../store/chatStore';
@@ -16,7 +16,7 @@ const ChatsPage = () => {
   const [searchUserId, setSearchUserId] = useState('');
   const [requestCount, setRequestCount] = useState(0);
 
-  const { conversations, loadingConversations, fetchConversations } = useChatStore();
+  const { conversations, loadingConversations, fetchConversations, mutedChatIds } = useChatStore();
 
   const fetchRequests = async () => {
     try {
@@ -159,11 +159,16 @@ const ChatsPage = () => {
                     </div>
                     <div className="flex justify-between items-center gap-2">
                       <p className="text-sm text-white/60 truncate leading-tight flex-1">{chat.lastMessage}</p>
-                      {chat.unreadCount > 0 && (
-                        <div className="bg-primary text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 animate-pulse flex-shrink-0">
-                          {chat.unreadCount}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {mutedChatIds.includes(chat._id) && (
+                          <FiBellOff className="text-white/30 text-xs" />
+                        )}
+                        {chat.unreadCount > 0 && (
+                          <div className="bg-primary text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 animate-pulse flex-shrink-0">
+                            {chat.unreadCount}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

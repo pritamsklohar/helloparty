@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
 
 import LandingPage from './pages/LandingPage';
@@ -98,6 +98,22 @@ const AppContent = () => {
         // If looking at this chat, tell backend to mark as read immediately
         if (isActive) {
           socket.emit('mark_as_read', { senderId: chatId, receiverId: user._id });
+        } else {
+          // Toast notifications for unmuted private chats
+          const isMuted = useChatStore.getState().mutedChatIds.includes(chatId);
+          if (!isMuted) {
+            const senderDetails = useChatStore.getState().usersCache[msg.sender];
+            const senderName = senderDetails?.username || 'a friend';
+            toast(`New message from ${senderName}`, {
+              icon: '💬',
+              style: {
+                borderRadius: '16px',
+                background: '#1a1a2e',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)'
+              }
+            });
+          }
         }
       };
 
@@ -120,6 +136,24 @@ const AppContent = () => {
         }
 
         addMessage(msg.groupId, msg, isActive);
+
+        // Toast notifications for unmuted groups
+        if (!isActive) {
+          const isMuted = useChatStore.getState().mutedChatIds.includes(msg.groupId);
+          if (!isMuted) {
+            const groupDetails = useChatStore.getState().groupsCache[msg.groupId];
+            const groupName = groupDetails?.name || 'Group';
+            toast(`New message in ${groupName}`, {
+              icon: '👥',
+              style: {
+                borderRadius: '16px',
+                background: '#1a1a2e',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)'
+              }
+            });
+          }
+        }
       };
 
       const handleMessageDeleted = (data) => {
