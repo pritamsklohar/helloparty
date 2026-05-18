@@ -107,8 +107,12 @@ const RoomPage = () => {
 
     // 2. Initialize WebRTC & Socket (with listener re-binding support)
     const initWebRTC = async () => {
+      const isAlreadyInRoom = socketRef.current && socketRef.current.connected && activeRoom && activeRoom._id === id;
+
       if (isInitializingRef.current) return;
-      isInitializingRef.current = true;
+      if (!isAlreadyInRoom) {
+        isInitializingRef.current = true;
+      }
 
       let stream = localStreamRef.current;
       if (!stream) {
@@ -166,20 +170,23 @@ const RoomPage = () => {
             avatarUrl: currentUser?.avatarUrl
           });
 
-          socketInstance.emit('peer:join_room', { 
-            roomId: id, 
-            user: {
-              userId: currentUser?._id || currentUser?.id,
-              uid: currentUser?.uid, // Send numeric display UID
-              username: currentUser?.username,
-              avatarUrl: currentUser?.avatarUrl
-            }
-          });
+          // Only join room if we are NOT already connected to it
+          if (!isAlreadyInRoom) {
+            socketInstance.emit('peer:join_room', { 
+              roomId: id, 
+              user: {
+                userId: currentUser?._id || currentUser?.id,
+                uid: currentUser?.uid, // Send numeric display UID
+                username: currentUser?.username,
+                avatarUrl: currentUser?.avatarUrl
+              }
+            });
+          }
         };
 
         socketInstance.on('connect', onConnect);
 
-        if (socketInstance.connected) {
+        if (socketInstance.connected && !isAlreadyInRoom) {
           onConnect();
         }
 
