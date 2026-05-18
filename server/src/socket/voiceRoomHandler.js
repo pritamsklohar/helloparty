@@ -336,7 +336,7 @@ const voiceRoomHandler = (io, socket) => {
   });
 
   // 2. Sit Down handler
-  socket.on('peer:sit_down', ({ roomId, seatIndex }) => {
+  socket.on('peer:sit_down', async ({ roomId, seatIndex }) => {
     try {
       const room = voiceRooms.get(roomId);
       if (!room) return;
@@ -402,7 +402,7 @@ const voiceRoomHandler = (io, socket) => {
   });
 
   // 3. Stand Up handler
-  socket.on('peer:stand_up', ({ roomId }) => {
+  socket.on('peer:stand_up', async ({ roomId }) => {
     try {
       const room = voiceRooms.get(roomId);
       if (!room) return;
@@ -491,7 +491,7 @@ const voiceRoomHandler = (io, socket) => {
   });
 
   // 4b. Admin Lift Up handler (Stand up user from seat to waiting list)
-  socket.on('peer:admin_lift_up', ({ roomId, targetSocketId }) => {
+  socket.on('peer:admin_lift_up', async ({ roomId, targetSocketId }) => {
     try {
       const room = voiceRooms.get(roomId);
       if (!room) return;
