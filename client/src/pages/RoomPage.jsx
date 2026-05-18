@@ -39,7 +39,7 @@ const RoomPage = () => {
   } = useVoiceRoom();
 
   const [loading, setLoading] = useState(!roomData);
-  const [activeMembersCount, setActiveMembersCount] = useState(roomData?.members?.length || 1);
+  const [activeMembersCount, setActiveMembersCount] = useState(roomData?.activeMembers || roomData?.members?.length || 1);
   const [message, setMessage] = useState('');
   const [gameActive, setGameActive] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -86,10 +86,13 @@ const RoomPage = () => {
 
     // 1. Get Room Data
     const fetchRoom = async () => {
+      // If we already have the room details preloaded globally for this roomId, skip loading entirely!
+      if (roomData && roomData._id === id) {
+        setLoading(false);
+        return;
+      }
       try {
-        if (!roomData) {
-          setLoading(true);
-        }
+        setLoading(true);
         const res = await api.get(`/rooms/${id}`);
         setRoomData(res.data);
         joinRoom(res.data);

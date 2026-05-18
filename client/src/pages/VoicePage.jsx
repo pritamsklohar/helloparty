@@ -6,10 +6,12 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { socket } from '../services/socket';
 import useAuthStore from '../store/authStore';
+import { useVoiceRoom } from '../context/VoiceRoomContext';
 
 const VoicePage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { joinRoom } = useVoiceRoom();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [roomName, setRoomName] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -93,6 +95,7 @@ const VoicePage = () => {
         password: hasPassword ? password : ''
       });
       setIsModalOpen(false);
+      joinRoom(res.data);
       navigate(`/room/${res.data._id}`);
     } catch (error) {
       console.error('Failed to create room:', error);
@@ -142,6 +145,7 @@ const VoicePage = () => {
                     toast.error("Already in Room");
                     return;
                   }
+                  joinRoom(room);
                   navigate(`/room/${room._id}`);
                 }}
                 className="bg-surfaceAlt/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 cursor-pointer hover:bg-surfaceAlt/60 transition-all group relative overflow-hidden"

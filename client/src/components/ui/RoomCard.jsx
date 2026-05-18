@@ -3,10 +3,12 @@ import { motion } from 'framer-motion';
 import { FiUsers, FiLock } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
+import { useVoiceRoom } from '../../context/VoiceRoomContext';
 
 const RoomCard = ({ room }) => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { joinRoom } = useVoiceRoom();
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -14,6 +16,13 @@ const RoomCard = ({ room }) => {
       toast.error("Already in Room");
       return;
     }
+    // Normalize properties for home page room cards
+    const normalizedRoom = {
+      ...room,
+      _id: room.id || room._id,
+      name: room.name || room.title
+    };
+    joinRoom(normalizedRoom);
     navigate(`/room/${room.id}`);
   };
 
