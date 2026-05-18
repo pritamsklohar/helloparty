@@ -58,6 +58,17 @@ const voiceRoomHandler = (io, socket) => {
     try {
       if (!roomId || !user) return;
 
+      // Check if user is already in another room in the DB
+      if (user.userId) {
+        const dbUser = await User.findById(user.userId);
+        if (dbUser && dbUser.inRoom && dbUser.inRoom.toString() !== roomId.toString()) {
+          socket.emit('voice_room:error', {
+            message: 'You are already in an active room session! Exit it first.'
+          });
+          return;
+        }
+      }
+
       socket.join(roomId);
       socket.voiceRoomId = roomId;
       socket.voiceUserHandle = user.username;
@@ -246,6 +257,11 @@ const voiceRoomHandler = (io, socket) => {
 
       // Broadcast seats updated to everyone
       broadcastSeatsUpdated(io, roomId, room);
+
+      // Persist inRoom to user document in Mongo
+      if (user.userId) {
+        await User.findByIdAndUpdate(user.userId, { inRoom: roomId }).catch(() => null);
+      }
 
     } catch (err) {
       console.error("Error in peer:join_room:", err.message);
@@ -543,7 +559,12 @@ const voiceRoomHandler = (io, socket) => {
 
           // Timeout fired and owner is still disconnected! Promote or close!
           const oldOwnerName = currentRoom.owner.name;
+          const oldOwnerUserId = currentRoom.owner.userId;
           currentRoom.owner = null;
+
+          if (oldOwnerUserId) {
+            await User.findByIdAndUpdate(oldOwnerUserId, { inRoom: null }).catch(() => null);
+          }
 
           let newOwnerCandidate = null;
           let promotedFrom = null;
@@ -594,6 +615,7 @@ const voiceRoomHandler = (io, socket) => {
             voiceRooms.delete(roomId);
             try {
               await Room.findByIdAndDelete(roomId);
+              await User.updateMany({ inRoom: roomId }, { inRoom: null }).catch(() => null);
               console.log(`Deleted empty room ${roomId} from DB after owner 2m timeout`);
               // Emit room deletion in real-time
               io.emit('room_deleted', roomId);
@@ -673,6 +695,7 @@ const voiceRoomHandler = (io, socket) => {
           voiceRooms.delete(roomId);
           try {
             await Room.findByIdAndDelete(roomId);
+            await User.updateMany({ inRoom: roomId }, { inRoom: null }).catch(() => null);
             console.log(`Deleted empty room ${roomId} from DB immediately after owner left`);
             // Emit room deletion in real-time
             io.emit('room_deleted', roomId);
@@ -706,6 +729,16 @@ const voiceRoomHandler = (io, socket) => {
     }
 
     updateActiveMembersCount(room, roomId, io);
+
+    // Clear inRoom inside user document in MongoDB
+    if (exitedUser && exitedUser.userId) {
+      try {
+        await User.findByIdAndUpdate(exitedUser.userId, { inRoom: null });
+        console.log(`Cleared inRoom in DB for user ${exitedUser.name}`);
+      } catch (err) {
+        console.error("Failed to clear inRoom in DB:", err.message);
+      }
+    }
 
     // Broadcast seats updated
     broadcastSeatsUpdated(io, roomId, room);

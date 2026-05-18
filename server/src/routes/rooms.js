@@ -1,5 +1,6 @@
 const express = require('express');
 const Room = require('../models/Room');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 
@@ -17,6 +18,11 @@ router.get('/', async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const { name, category, isPrivate, password } = req.body;
+    
+    // Check if the user is already in a room session
+    if (req.user.inRoom) {
+      return res.status(400).json({ message: 'You are already in an active room session! Exit it first.' });
+    }
     
     const room = new Room({
       name,
@@ -66,6 +72,9 @@ router.delete('/:id', protect, async (req, res) => {
     }
 
     await Room.findByIdAndDelete(req.params.id);
+    
+    // Remove the inRoom field from any users currently registered in this room
+    await User.updateMany({ inRoom: req.params.id }, { inRoom: null });
     
     // Broadcast room deletion in real-time
     if (req.io) {

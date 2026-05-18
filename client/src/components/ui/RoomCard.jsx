@@ -2,13 +2,15 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUsers, FiLock } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import useAuthStore from '../../store/authStore';
 
 const RoomCard = ({ room }) => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const handleJoin = (e) => {
     e.preventDefault();
-    if (localStorage.getItem('inRoom') === 'true') {
+    if (user?.inRoom) {
       toast.error("Already in Room");
       return;
     }

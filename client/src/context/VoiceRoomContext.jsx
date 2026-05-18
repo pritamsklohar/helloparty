@@ -35,6 +35,14 @@ export const VoiceRoomProvider = ({ children }) => {
     localStorage.setItem('inRoom', 'true');
     localStorage.setItem('activeRoomId', roomDataVal._id);
     localStorage.setItem('roomMinimized', 'false');
+
+    // Update local user state in authStore
+    const authUser = useAuthStore.getState().user;
+    if (authUser) {
+      useAuthStore.setState({
+        user: { ...authUser, inRoom: roomDataVal._id }
+      });
+    }
   };
 
   const minimizeRoom = () => {
@@ -98,6 +106,14 @@ export const VoiceRoomProvider = ({ children }) => {
     localStorage.setItem('inRoom', 'false');
     localStorage.removeItem('activeRoomId');
     localStorage.removeItem('roomMinimized');
+
+    // Update local user state in authStore
+    const authUser = useAuthStore.getState().user;
+    if (authUser) {
+      useAuthStore.setState({
+        user: { ...authUser, inRoom: null }
+      });
+    }
   };
 
   return (

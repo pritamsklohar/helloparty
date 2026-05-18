@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema({
   xp: { type: Number, default: 0 },
   isOnline: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
+  inRoom: { type: mongoose.Schema.Types.ObjectId, ref: 'VoiceRoom', default: null },
   stats: {
     gamesPlayed: { type: Number, default: 0 },
     gamesWon: { type: Number, default: 0 },

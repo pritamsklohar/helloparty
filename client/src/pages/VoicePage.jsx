@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { socket } from '../services/socket';
+import useAuthStore from '../store/authStore';
 
 const VoicePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [roomName, setRoomName] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -77,7 +79,7 @@ const VoicePage = () => {
     e.preventDefault();
     if (!roomName.trim()) return;
 
-    if (localStorage.getItem('inRoom') === 'true') {
+    if (user?.inRoom) {
       toast.error("Already in Room");
       return;
     }
@@ -136,7 +138,7 @@ const VoicePage = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
-                  if (localStorage.getItem('inRoom') === 'true') {
+                  if (user?.inRoom) {
                     toast.error("Already in Room");
                     return;
                   }
