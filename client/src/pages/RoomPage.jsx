@@ -114,7 +114,15 @@ const RoomPage = () => {
       if (!stream) {
         try {
           console.log('Initializing owner/user mic. Default micEnabled: true');
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              latency: 0
+            }, 
+            video: false 
+          });
           localStreamRef.current = stream;
         } catch (err) {
           console.warn('Microphone permission denied or unavailable. Entering in listen-only mode:', err);
