@@ -747,6 +747,60 @@ const voiceRoomHandler = (io, socket) => {
     io.in(roomId).emit('peer:user_left', { userId: socketId });
   };
 
+  socket.on('peer:update_profile', async ({ userId, username, avatarUrl }) => {
+    try {
+      if (!userId) return;
+
+      // Find if the user is currently inside any room in our in-memory map
+      for (const [roomId, room] of voiceRooms.entries()) {
+        let updated = false;
+
+        // 1. Check Owner
+        if (room.owner && room.owner.userId === userId) {
+          room.owner.name = username;
+          room.owner.handle = username;
+          room.owner.avatar = avatarUrl;
+          updated = true;
+        }
+
+        // 2. Check Seats
+        for (let i = 0; i < 8; i++) {
+          if (room.seats[i] && room.seats[i].userId === userId) {
+            room.seats[i].name = username;
+            room.seats[i].handle = username;
+            room.seats[i].avatar = avatarUrl;
+            updated = true;
+          }
+        }
+
+        // 3. Check Waiting List
+        const waitingUser = room.waitingList.find(u => u.userId === userId);
+        if (waitingUser) {
+          waitingUser.name = username;
+          waitingUser.handle = username;
+          waitingUser.avatar = avatarUrl;
+          updated = true;
+        }
+
+        if (updated) {
+          console.log(`Real-time profile updated in room ${roomId} for user: ${username}`);
+          
+          // Broadcast seat updates to all peers in the room so their UI refreshes in 0ms
+          broadcastSeatsUpdated(io, roomId, room);
+          
+          // Also broadcast a dedicated profile updated event
+          io.in(roomId).emit('peer:profile_updated', {
+            userId,
+            username,
+            avatarUrl
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error in peer:update_profile handler:", err.message);
+    }
+  });
+
   socket.on('peer:leave_room', async ({ roomId }, callback) => {
     try {
       await exitUser(roomId, socket.id, false); // isSuddenDisconnect = false

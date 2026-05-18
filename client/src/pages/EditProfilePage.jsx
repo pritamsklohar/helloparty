@@ -5,6 +5,7 @@ import { FiChevronLeft, FiCamera, FiUser, FiFileText, FiSave, FiMapPin, FiCalend
 import useAuthStore from '../store/authStore';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { socket } from '../services/socket';
 
 import { useRef } from 'react';
 
@@ -61,6 +62,14 @@ const EditProfilePage = () => {
     try {
       const res = await api.put('/users/profile', formData);
       setUser(res.data.user);
+
+      // Emit real-time socket update for active room members
+      socket.emit('peer:update_profile', {
+        userId: res.data.user._id,
+        username: res.data.user.username,
+        avatarUrl: res.data.user.avatarUrl
+      });
+
       toast.success('Profile updated successfully!');
       navigate(-1);
     } catch (err) {

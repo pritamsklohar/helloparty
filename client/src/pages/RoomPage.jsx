@@ -145,6 +145,7 @@ const RoomPage = () => {
         socketInstance.off('peer:kicked_by_owner');
         socketInstance.off('voice_room:error');
         socketInstance.off('peer:user_left');
+        socketInstance.off('peer:profile_updated');
 
         const onConnect = () => {
           myUserId.current = socketInstance.id;
@@ -223,6 +224,58 @@ const RoomPage = () => {
 
         socketInstance.on('peer:receive_message', (msg) => {
           setMessages(prev => [...prev, msg]);
+        });
+
+        socketInstance.on('peer:profile_updated', ({ userId, username, avatarUrl }) => {
+          // Update host in roomData if host changed
+          setRoomData(prev => {
+            if (!prev) return prev;
+            const isHost = prev.host && (prev.host._id === userId || prev.host.id === userId);
+            if (isHost) {
+              const updatedHost = {
+                ...prev.host,
+                username,
+                avatarUrl
+              };
+              return {
+                ...prev,
+                host: updatedHost
+              };
+            }
+            return prev;
+          });
+
+          // Update activeRoom host if needed
+          setActiveRoom(prev => {
+            if (!prev) return prev;
+            const isHost = prev.host && (prev.host._id === userId || prev.host.id === userId);
+            if (isHost) {
+              const updatedHost = {
+                ...prev.host,
+                username,
+                avatarUrl
+              };
+              return {
+                ...prev,
+                host: updatedHost
+              };
+            }
+            return prev;
+          });
+
+          // Update our local socketToUser mapping
+          for (const [sId, u] of socketToUserRef.current.entries()) {
+            if (u.userId === userId || u.id === userId) {
+              socketToUserRef.current.set(sId, {
+                ...u,
+                username,
+                avatarUrl
+              });
+            }
+          }
+          
+          // Re-trigger visual updates
+          updateRemotePeers();
         });
 
         socketInstance.on('peer:offer', ({ sdp, fromUserId }) => {
