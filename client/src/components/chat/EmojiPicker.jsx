@@ -5,15 +5,25 @@ import { FiArrowLeft } from 'react-icons/fi';
 const EmojiPicker = ({ isOpen, onClose, onSelect }) => {
   const [category, setCategory] = useState('emoji');
   
-  const TOTAL_EMOJIS = 50;
-  const COLS = 10;
-  
   const TILE_SIZE = 48;
   const ORIGINAL_TILE_SIZE = 256;
   const PADDING = 6;
   const SCALE = TILE_SIZE / ORIGINAL_TILE_SIZE;
+
+  const getCategoryConfig = (cat) => {
+    if (cat === 'girl' || cat === 'boy') {
+      return { cols: 5, total: 30 };
+    }
+    return { cols: 10, total: 50 };
+  };
+
+  const { cols: COLS, total: TOTAL_EMOJIS } = getCategoryConfig(category);
   
-  const bgWidth = (COLS * ORIGINAL_TILE_SIZE + 11 * PADDING) * SCALE;
+  // Padding count is typically COLS + 1 for edges, but proportional scaling works best if we match the width perfectly.
+  // For girl (1316px wide): 5 * 256 + 6 * 6 = 1316. So padding = COLS + 1
+  // For emojis (1334px wide): 10 * 128 + ... but the user said 10x5, 256px tiles with 6px padding.
+  // We'll stick to the strict formula: width = COLS * ORIGINAL_TILE_SIZE + (COLS + 1) * PADDING
+  const bgWidth = (COLS * ORIGINAL_TILE_SIZE + (COLS + 1) * PADDING) * SCALE;
 
   const getSpriteSheet = () => {
     switch (category) {

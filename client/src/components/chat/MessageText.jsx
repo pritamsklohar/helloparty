@@ -1,12 +1,16 @@
 import React from 'react';
 
-const TOTAL_EMOJIS = 50;
-const COLS = 10;
 const TILE_SIZE = 24; // smaller size for in-text
 const ORIGINAL_TILE_SIZE = 256;
 const PADDING = 6;
 const SCALE = TILE_SIZE / ORIGINAL_TILE_SIZE;
-const bgWidth = (COLS * ORIGINAL_TILE_SIZE + 11 * PADDING) * SCALE;
+
+const getCategoryConfig = (cat) => {
+  if (cat === 'girl' || cat === 'boy') {
+    return { cols: 5, total: 30 };
+  }
+  return { cols: 10, total: 50 };
+};
 
 const getSpriteSheet = (category) => {
   switch (category) {
@@ -17,6 +21,9 @@ const getSpriteSheet = (category) => {
 };
 
 const renderEmoji = (category, index) => {
+  const { cols: COLS } = getCategoryConfig(category);
+  const bgWidth = (COLS * ORIGINAL_TILE_SIZE + (COLS + 1) * PADDING) * SCALE;
+  
   const col = index % COLS;
   const row = Math.floor(index / COLS);
   const x = (col * 262 + 6) * SCALE;
@@ -51,6 +58,7 @@ const MessageText = ({ text }) => {
         if (match) {
           const category = match[1];
           const index = parseInt(match[2], 10);
+          const { total: TOTAL_EMOJIS } = getCategoryConfig(category);
           if (index >= 0 && index < TOTAL_EMOJIS) {
             return renderEmoji(category, index);
           }
