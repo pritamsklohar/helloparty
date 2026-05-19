@@ -22,6 +22,7 @@ import CreateMemoryPage from './pages/CreateMemoryPage';
 import CreateGroupPage from './pages/CreateGroupPage';
 import GroupChatPage from './pages/GroupChatPage';
 import GroupInfoPage from './pages/GroupInfoPage';
+import GiftWallPage from './pages/GiftWallPage';
 import BottomNav from './components/layout/BottomNav';
 import { VoiceRoomProvider, useVoiceRoom } from './context/VoiceRoomContext';
 import MinimizedRoom from './components/MinimizedRoom';
@@ -311,6 +312,7 @@ const AppContent = () => {
         <Route path="/groups/create" element={<ProtectedRoute><CreateGroupPage /></ProtectedRoute>} />
         <Route path="/groups/:id" element={<ProtectedRoute><GroupChatPage /></ProtectedRoute>} />
         <Route path="/groups/:id/info" element={<ProtectedRoute><GroupInfoPage /></ProtectedRoute>} />
+        <Route path="/gift-wall/:userId" element={<ProtectedRoute><GiftWallPage /></ProtectedRoute>} />
       </Routes>
       
       {showBottomNav && <BottomNav />}

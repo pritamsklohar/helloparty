@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiEdit2, FiSettings, FiCheckCircle, FiCopy, FiUser, FiImage, FiBarChart2, FiEye, FiUserPlus, FiGlobe, FiHelpCircle, FiChevronRight } from 'react-icons/fi';
+import { FiEdit2, FiSettings, FiCheckCircle, FiCopy, FiUser, FiImage, FiBarChart2, FiEye, FiUserPlus, FiGlobe, FiHelpCircle, FiChevronRight, FiGift } from 'react-icons/fi';
 import { FaCoins, FaGamepad, FaTrophy, FaUsers, FaArrowRight, FaMars, FaVenus, FaGenderless } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
@@ -152,6 +152,33 @@ const ProfilePage = () => {
                       <h3 className="text-sm font-black text-white tracking-tight uppercase tracking-widest">My Memories</h3>
                       <p className="text-[10px] text-white/30 font-black tracking-[0.15em] uppercase truncate max-w-[150px]">
                         {latestMemory ? (latestMemory.content || 'Latest shared vibe') : 'No vibes yet'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-primary transition-all shadow-lg">
+                    <FiChevronRight className="text-white/20 group-hover:text-white transition-colors text-2xl translate-x-0.5" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Gift Wall Section */}
+              <div className="mt-4">
+                <div 
+                  onClick={() => navigate(`/gift-wall/${profileData.uid || profileData._id}`)}
+                  className="bg-surfaceAlt/30 rounded-[32px] p-5 flex items-center justify-between group cursor-pointer hover:bg-white/[0.05] border border-white/5 transition-all shadow-2xl"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-surfaceAlt rounded-[22px] overflow-hidden flex-shrink-0 flex items-center justify-center border border-white/10 shadow-inner">
+                      {profileData.gifts?.length > 0 ? (
+                        <img src={profileData.gifts[0].imageUrl} className="w-full h-full object-cover" alt="Gift" />
+                      ) : (
+                        <FiGift className="text-white/10 text-3xl" />
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-black text-white tracking-tight uppercase tracking-widest">Gift Wall</h3>
+                      <p className="text-[10px] text-white/30 font-black tracking-[0.15em] uppercase truncate max-w-[150px]">
+                        {profileData.gifts?.length > 0 ? `${profileData.gifts.length} Gifts` : 'no gifts for now'}
                       </p>
                     </div>
                   </div>
