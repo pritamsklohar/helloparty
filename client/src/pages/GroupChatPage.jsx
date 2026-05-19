@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import useChatStore from '../store/chatStore';
 import { socket } from '../services/socket';
+import EmojiPicker from '../components/chat/EmojiPicker';
+import MessageText from '../components/chat/MessageText';
 
 const GroupChatPage = () => {
   const { id } = useParams();
@@ -14,6 +16,7 @@ const GroupChatPage = () => {
   const { user } = useAuthStore();
   const [inputText, setInputText] = useState('');
   const [showInputOverlay, setShowInputOverlay] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef();
 
   const { 
@@ -177,7 +180,7 @@ const GroupChatPage = () => {
                       ? 'bg-gradient-to-br from-primary to-primaryHover text-white rounded-br-none shadow-primary/20' 
                       : 'bg-surfaceAlt/40 text-white/90 rounded-bl-none border border-white/5'
                   }`}>
-                    {msg.text}
+                    <MessageText text={msg.text} />
                   </div>
                   <span className="text-[7px] text-white/10 uppercase font-black tracking-[0.2em] px-1">
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -207,7 +210,7 @@ const GroupChatPage = () => {
       <AnimatePresence>
         {showInputOverlay && (
           <>
-            <div className="fixed inset-0 z-[110]" onClick={() => setShowInputOverlay(false)} />
+            <div className="fixed inset-0 z-[110]" onClick={() => { setShowInputOverlay(false); setShowEmojiPicker(false); }} />
             <motion.div 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
@@ -215,11 +218,16 @@ const GroupChatPage = () => {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed bottom-0 left-0 w-full bg-surfaceAlt border-t border-white/10 p-3 z-[120] flex flex-col shadow-2xl pb-6 md:pb-4"
             >
-              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full">
+              <EmojiPicker 
+                isOpen={showEmojiPicker} 
+                onClose={() => setShowEmojiPicker(false)} 
+                onSelect={(emoji) => setInputText(prev => prev + emoji)}
+              />
+              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); setShowEmojiPicker(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full relative">
                 <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
                   <FiImage className="text-2xl" />
                 </button>
-                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 flex-shrink-0 ${showEmojiPicker ? 'text-primary' : 'text-white/60 hover:text-white'}`}>
                   <FiSmile className="text-2xl" />
                 </button>
                 
