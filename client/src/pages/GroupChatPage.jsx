@@ -17,7 +17,8 @@ const GroupChatPage = () => {
   const [inputText, setInputText] = useState('');
   const [showInputOverlay, setShowInputOverlay] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const messagesEndRef = useRef();
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const { 
     messagesCache, 
@@ -218,12 +219,7 @@ const GroupChatPage = () => {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed bottom-0 left-0 w-full bg-surfaceAlt border-t border-white/10 p-3 z-[120] flex flex-col shadow-2xl pb-6 md:pb-4"
             >
-              <EmojiPicker 
-                isOpen={showEmojiPicker} 
-                onClose={() => setShowEmojiPicker(false)} 
-                onSelect={(emoji) => setInputText(prev => prev + emoji)}
-              />
-              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); setShowEmojiPicker(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full relative">
+              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); setShowEmojiPicker(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full relative z-10">
                 <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
                   <FiImage className="text-2xl" />
                 </button>
@@ -232,6 +228,8 @@ const GroupChatPage = () => {
                   onClick={() => {
                     if (!showEmojiPicker && document.activeElement) {
                       document.activeElement.blur();
+                    } else if (showEmojiPicker) {
+                      inputRef.current?.focus();
                     }
                     setShowEmojiPicker(!showEmojiPicker);
                   }} 
@@ -242,6 +240,7 @@ const GroupChatPage = () => {
                 
                 <div className="flex-1 relative">
                   <input 
+                    ref={inputRef}
                     autoFocus
                     type="text" 
                     value={inputText}
@@ -259,6 +258,14 @@ const GroupChatPage = () => {
                   <FiSend className="text-xl" />
                 </motion.button>
               </form>
+              <EmojiPicker 
+                isOpen={showEmojiPicker} 
+                onClose={() => {
+                  setShowEmojiPicker(false);
+                  inputRef.current?.focus();
+                }} 
+                onSelect={(emoji) => setInputText(prev => prev + emoji)}
+              />
             </motion.div>
           </>
         )}

@@ -37,12 +37,11 @@ const EmojiPicker = ({ isOpen, onClose, onSelect }) => {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ y: "100%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "100%", opacity: 0 }}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 320, opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="w-full bg-[#13131f] border-t border-white/10 z-[150] flex flex-col overflow-hidden"
-          style={{ height: '320px' }}
+          className="w-full bg-[#13131f] flex flex-col overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-2 py-3 border-b border-white/5 bg-surfaceAlt/50">
