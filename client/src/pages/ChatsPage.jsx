@@ -6,6 +6,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import useChatStore from '../store/chatStore';
 import useAuthStore from '../store/authStore';
+import MessageText from '../components/chat/MessageText';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
@@ -158,7 +159,7 @@ const ChatsPage = () => {
                       </span>
                     </div>
                     <div className="flex justify-between items-center gap-2">
-                      <p className="text-sm text-white/60 truncate leading-tight flex-1">{chat.lastMessage}</p>
+                      <p className="text-sm text-white/60 truncate leading-tight flex-1"><MessageText text={chat.lastMessage} /></p>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {mutedChatIds.includes(chat._id) && (
                           <FiBellOff className="text-white/30 text-xs" />
