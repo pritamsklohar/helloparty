@@ -8,7 +8,15 @@ const PADDING = 6;
 const SCALE = TILE_SIZE / ORIGINAL_TILE_SIZE;
 const bgWidth = (COLS * ORIGINAL_TILE_SIZE + 11 * PADDING) * SCALE;
 
-const renderEmoji = (index) => {
+const getSpriteSheet = (category) => {
+  switch (category) {
+    case 'girl': return '/emojis/girl_emoji_spritesheet_256px.png';
+    case 'boy': return '/emojis/boy_emoji_spritesheet_256px.png';
+    default: return '/emojis/emojis_spritesheet_256px.png';
+  }
+};
+
+const renderEmoji = (category, index) => {
   const col = index % COLS;
   const row = Math.floor(index / COLS);
   const x = (col * 262 + 6) * SCALE;
@@ -16,12 +24,12 @@ const renderEmoji = (index) => {
 
   return (
     <span
-      key={`emoji-${index}-${Math.random()}`}
+      key={`emoji-${category}-${index}-${Math.random()}`}
       className="inline-block align-middle mx-0.5"
       style={{
         width: `${TILE_SIZE}px`,
         height: `${TILE_SIZE}px`,
-        backgroundImage: `url('/emojis/emojis_spritesheet_256px.png')`,
+        backgroundImage: `url('${getSpriteSheet(category)}')`,
         backgroundSize: `${bgWidth}px auto`,
         backgroundPosition: `-${x}px -${y}px`,
         backgroundRepeat: 'no-repeat',
@@ -33,17 +41,18 @@ const renderEmoji = (index) => {
 const MessageText = ({ text }) => {
   if (!text) return null;
   
-  // Split by [emoji:X] regex
-  const parts = text.split(/(\[emoji:\d+\])/g);
+  // Split by [category:X] regex (emoji, girl, boy)
+  const parts = text.split(/(\[(?:emoji|girl|boy):\d+\])/g);
   
   return (
     <>
       {parts.map((part, i) => {
-        const match = part.match(/^\[emoji:(\d+)\]$/);
+        const match = part.match(/^\[(emoji|girl|boy):(\d+)\]$/);
         if (match) {
-          const index = parseInt(match[1], 10);
+          const category = match[1];
+          const index = parseInt(match[2], 10);
           if (index >= 0 && index < TOTAL_EMOJIS) {
-            return renderEmoji(index);
+            return renderEmoji(category, index);
           }
         }
         return <span key={i}>{part}</span>;

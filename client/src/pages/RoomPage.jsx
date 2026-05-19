@@ -1003,7 +1003,16 @@ const RoomPage = () => {
                 <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
                   <FiImage className="text-2xl" />
                 </button>
-                <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 flex-shrink-0 ${showEmojiPicker ? 'text-primary' : 'text-white/60 hover:text-white'}`}>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    if (!showEmojiPicker && document.activeElement) {
+                      document.activeElement.blur();
+                    }
+                    setShowEmojiPicker(!showEmojiPicker);
+                  }} 
+                  className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 flex-shrink-0 ${showEmojiPicker ? 'text-primary' : 'text-white/60 hover:text-white'}`}
+                >
                   <FiSmile className="text-2xl" />
                 </button>
                 
