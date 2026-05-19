@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiChevronLeft, FiSend, FiUsers, FiInfo, FiMoreVertical, FiLogOut, FiTrash2, FiBellOff } from 'react-icons/fi';
+import { FiChevronLeft, FiSend, FiUsers, FiInfo, FiMoreVertical, FiLogOut, FiTrash2, FiBellOff, FiImage, FiSmile, FiMessageCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -13,6 +13,7 @@ const GroupChatPage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [inputText, setInputText] = useState('');
+  const [showInputOverlay, setShowInputOverlay] = useState(false);
   const messagesEndRef = useRef();
 
   const { 
@@ -188,26 +189,63 @@ const GroupChatPage = () => {
          <div ref={messagesEndRef} />
       </main>
 
-      {/* Input */}
-      <footer className="p-4 bg-transparent">
-        <form onSubmit={handleSendMessage} className="relative flex items-center gap-3">
-           <div className="flex-1 relative">
-             <input 
-              type="text"
-              placeholder="Type something to the squad..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              className="w-full bg-surfaceAlt/20 border border-white/5 rounded-3xl py-4.5 pl-6 pr-12 text-sm focus:outline-none focus:border-primary/40 focus:bg-surfaceAlt/30 transition-all placeholder:text-white/10"
-             />
-           </div>
-           <button 
-            type="submit"
-            className="w-14 h-14 bg-primary text-white rounded-[22px] flex items-center justify-center shadow-xl shadow-primary/20 active:scale-90 transition-all hover:bg-primaryHover"
-           >
-             <FiSend size={22} className="rotate-[-10deg]" />
-           </button>
-        </form>
-      </footer>
+      {/* Input Bar (Button Mode) */}
+      {!showInputOverlay && (
+        <div className="p-4 bg-transparent pb-8 md:pb-4">
+          <button 
+            type="button" 
+            onClick={() => setShowInputOverlay(true)}
+            className="w-full bg-surfaceAlt/20 border border-white/5 text-white/50 rounded-3xl py-4 px-6 text-left text-sm flex items-center gap-3 shadow-lg"
+          >
+            <FiMessageCircle className="text-xl" />
+            {inputText ? inputText : "Type something to the squad..."}
+          </button>
+        </div>
+      )}
+
+      {/* Input Overlay (Active Mode) */}
+      <AnimatePresence>
+        {showInputOverlay && (
+          <>
+            <div className="fixed inset-0 z-[110]" onClick={() => setShowInputOverlay(false)} />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 w-full bg-surfaceAlt border-t border-white/10 p-3 z-[120] flex flex-col shadow-2xl pb-6 md:pb-4"
+            >
+              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full">
+                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                  <FiImage className="text-2xl" />
+                </button>
+                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                  <FiSmile className="text-2xl" />
+                </button>
+                
+                <div className="flex-1 relative">
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="Type something to the squad..."
+                    className="w-full bg-surface border border-white/10 text-white rounded-2xl py-3 px-4 focus:outline-none focus:border-primary transition-all placeholder:text-white/20 text-sm shadow-inner"
+                  />
+                </div>
+
+                <motion.button 
+                  type="submit"
+                  disabled={!inputText.trim()}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full shadow-lg transition-all flex-shrink-0 ml-1 ${inputText.trim() ? 'bg-primary text-white active:scale-90 shadow-primary/30' : 'bg-white/10 text-white/30'}`}
+                >
+                  <FiSend className="text-xl" />
+                </motion.button>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

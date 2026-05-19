@@ -20,6 +20,7 @@ const ChatRoomPage = () => {
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ x: 0, y: 0, show: false, messageId: null });
+  const [showInputOverlay, setShowInputOverlay] = useState(false);
   const longPressTimer = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -345,72 +346,63 @@ const ChatRoomPage = () => {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Input Bar */}
-      <div className="p-4 bg-surfaceAlt/50 backdrop-blur-xl border-t border-white/5 pb-8 md:pb-4">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-3 max-w-4xl mx-auto">
-          <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
-            <FiSmile className="text-2xl" />
+      {/* Input Bar (Button Mode) */}
+      {!showInputOverlay && (
+        <div className="p-4 bg-surfaceAlt/50 backdrop-blur-xl border-t border-white/5 pb-8 md:pb-4 flex items-center">
+          <button 
+            type="button" 
+            onClick={() => setShowInputOverlay(true)}
+            className="w-full bg-surface border border-white/10 text-white/50 rounded-2xl py-3 px-4 text-left text-sm flex items-center gap-3 shadow-inner"
+          >
+            <FiMessageCircle className="text-xl" />
+            {message ? message : "Type a message..."}
           </button>
-          
-          <div className="flex-1 relative">
-            <input 
-              type="text" 
-              value={message}
-              onChange={handleInputChange}
-              placeholder="Type a message..."
-              className="w-full bg-surface border border-white/10 text-white rounded-2xl py-3 px-4 focus:outline-none focus:border-primary transition-all placeholder:text-white/20 text-sm shadow-inner"
-            />
-          </div>
+        </div>
+      )}
 
-          <div className="flex items-center gap-1 relative">
-            <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
-              <FiGift className="text-2xl text-accent" />
-            </button>
-            <button 
-              type="button" 
-              onClick={() => setShowPlusOptions(!showPlusOptions)}
-              className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0"
+      {/* Input Overlay (Active Mode) */}
+      <AnimatePresence>
+        {showInputOverlay && (
+          <>
+            <div className="fixed inset-0 z-[110]" onClick={() => setShowInputOverlay(false)} />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 w-full bg-surfaceAlt border-t border-white/10 p-3 z-[120] flex flex-col shadow-2xl pb-6 md:pb-4"
             >
-              <FiPlus className="text-2xl text-primary" />
-            </button>
+              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full">
+                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                  <FiImage className="text-2xl" />
+                </button>
+                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                  <FiSmile className="text-2xl" />
+                </button>
+                
+                <div className="flex-1 relative">
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={message}
+                    onChange={handleInputChange}
+                    placeholder="Type a message..."
+                    className="w-full bg-surface border border-white/10 text-white rounded-2xl py-3 px-4 focus:outline-none focus:border-primary transition-all placeholder:text-white/20 text-sm shadow-inner"
+                  />
+                </div>
 
-            <AnimatePresence>
-              {showPlusOptions && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowPlusOptions(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute bottom-full right-0 mb-2 w-48 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                  >
-                    <div className="py-2 px-1 flex flex-col">
-                       <div className="px-4 py-2 text-[10px] uppercase tracking-widest text-white/30 font-bold">Options</div>
-                       <button onClick={() => setShowPlusOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
-                         <FiImage className="text-lg text-blue-400" /> Gallery
-                       </button>
-                       <button onClick={() => setShowPlusOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
-                         <FiCamera className="text-lg text-purple-400" /> Camera
-                       </button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-            
-            {message.trim() && (
-              <motion.button 
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                type="submit"
-                className="w-10 h-10 flex items-center justify-center bg-primary text-white rounded-full shadow-lg shadow-primary/30 active:scale-90 transition-all flex-shrink-0 ml-1"
-              >
-                <FiSend className="text-xl" />
-              </motion.button>
-            )}
-          </div>
-        </form>
-      </div>
+                <motion.button 
+                  type="submit"
+                  disabled={!message.trim()}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full shadow-lg transition-all flex-shrink-0 ml-1 ${message.trim() ? 'bg-primary text-white active:scale-90 shadow-primary/30' : 'bg-white/10 text-white/30'}`}
+                >
+                  <FiSend className="text-xl" />
+                </motion.button>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Message Context Menu */}
       <AnimatePresence>

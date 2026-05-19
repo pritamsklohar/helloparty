@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiChevronLeft, FiSettings, FiShare2, FiMic, FiMicOff, FiVolume2, FiVolumeX, FiGift, FiUserPlus, FiSmile, FiSend, FiX, FiMoreVertical, FiPlus, FiUsers, FiAlertTriangle, FiLogOut } from 'react-icons/fi';
+import { FiChevronLeft, FiSettings, FiShare2, FiMic, FiMicOff, FiVolume2, FiVolumeX, FiGift, FiUserPlus, FiSmile, FiSend, FiX, FiMoreVertical, FiPlus, FiUsers, FiAlertTriangle, FiLogOut, FiImage, FiMessageCircle } from 'react-icons/fi';
 import { FaCrown, FaGamepad, FaStop } from 'react-icons/fa';
 import api from '../services/api';
 import { useVoiceRoom } from '../context/VoiceRoomContext';
@@ -45,6 +45,7 @@ const RoomPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [seatModal, setSeatModal] = useState(null); 
+  const [showInputOverlay, setShowInputOverlay] = useState(false);
   const { user: currentUser } = useAuthStore();
   
   const ownerId = roomData?.host?.id || roomData?.host?._id;
@@ -957,16 +958,18 @@ const RoomPage = () => {
           </button>
         </div>
 
-        {/* Chat Input */}
-        <form onSubmit={handleSendMessage} className="flex-1 mx-4 h-9 bg-black/20 rounded-full border border-white/10 px-4 flex items-center">
-          <input 
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type..."
-            className="w-full bg-transparent border-none outline-none text-white text-xs placeholder:text-white/40"
-          />
-        </form>
+        {/* Chat Input Bar (Button Mode) */}
+        {!showInputOverlay && (
+          <div className="flex-1 mx-4">
+            <button 
+              type="button"
+              onClick={() => setShowInputOverlay(true)}
+              className="w-full h-9 bg-black/20 hover:bg-black/40 transition-colors rounded-full border border-white/10 px-4 flex items-center justify-start text-xs text-white/40 overflow-hidden whitespace-nowrap"
+            >
+              {message ? <span className="text-white truncate">{message}</span> : "Type a message..."}
+            </button>
+          </div>
+        )}
 
         {/* Right Icons */}
         <div className="flex gap-4 text-white hover:text-white/80 transition-colors items-center">
@@ -975,6 +978,50 @@ const RoomPage = () => {
           <button><FiSettings className="text-xl" /></button>
         </div>
       </div>
+
+      {/* Input Overlay (Active Mode) */}
+      <AnimatePresence>
+        {showInputOverlay && (
+          <>
+            <div className="fixed inset-0 z-[110]" onClick={() => setShowInputOverlay(false)} />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 w-full bg-surfaceAlt border-t border-white/10 p-3 z-[120] flex flex-col shadow-2xl pb-6 md:pb-4"
+            >
+              <form onSubmit={(e) => { handleSendMessage(e); setShowInputOverlay(false); }} className="flex items-center gap-3 max-w-4xl mx-auto w-full">
+                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                  <FiImage className="text-2xl" />
+                </button>
+                <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                  <FiSmile className="text-2xl" />
+                </button>
+                
+                <div className="flex-1 relative">
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="w-full bg-surface border border-white/10 text-white rounded-2xl py-3 px-4 focus:outline-none focus:border-primary transition-all placeholder:text-white/20 text-sm shadow-inner"
+                  />
+                </div>
+
+                <motion.button 
+                  type="submit"
+                  disabled={!message.trim()}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full shadow-lg transition-all flex-shrink-0 ml-1 ${message.trim() ? 'bg-primary text-white active:scale-90 shadow-primary/30' : 'bg-white/10 text-white/30'}`}
+                >
+                  <FiSend className="text-xl" />
+                </motion.button>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
