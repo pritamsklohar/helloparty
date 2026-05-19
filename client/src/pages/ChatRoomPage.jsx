@@ -348,15 +348,59 @@ const ChatRoomPage = () => {
 
       {/* Input Bar (Button Mode) */}
       {!showInputOverlay && (
-        <div className="p-4 bg-surfaceAlt/50 backdrop-blur-xl border-t border-white/5 pb-8 md:pb-4 flex items-center">
-          <button 
-            type="button" 
-            onClick={() => setShowInputOverlay(true)}
-            className="w-full bg-surface border border-white/10 text-white/50 rounded-2xl py-3 px-4 text-left text-sm flex items-center gap-3 shadow-inner"
-          >
-            <FiMessageCircle className="text-xl" />
-            {message ? message : "Type a message..."}
-          </button>
+        <div className="p-4 bg-surfaceAlt/50 backdrop-blur-xl border-t border-white/5 pb-8 md:pb-4">
+          <div className="flex items-center gap-3 max-w-4xl mx-auto">
+            <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+              <FiSmile className="text-2xl" />
+            </button>
+            
+            <div className="flex-1 relative">
+              <button 
+                type="button" 
+                onClick={() => setShowInputOverlay(true)}
+                className="w-full bg-surface border border-white/10 text-white/50 rounded-2xl py-3 px-4 text-left text-sm flex items-center gap-2 shadow-inner overflow-hidden whitespace-nowrap"
+              >
+                {message ? <span className="text-white truncate">{message}</span> : "Type a message..."}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 relative">
+              <button type="button" className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0">
+                <FiGift className="text-2xl text-accent" />
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setShowPlusOptions(!showPlusOptions)}
+                className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors active:scale-90 flex-shrink-0"
+              >
+                <FiPlus className="text-2xl text-primary" />
+              </button>
+
+              <AnimatePresence>
+                {showPlusOptions && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowPlusOptions(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute bottom-full right-0 mb-2 w-48 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="py-2 px-1 flex flex-col">
+                         <div className="px-4 py-2 text-[10px] uppercase tracking-widest text-white/30 font-bold">Options</div>
+                         <button onClick={() => setShowPlusOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
+                           <FiImage className="text-lg text-blue-400" /> Gallery
+                         </button>
+                         <button onClick={() => setShowPlusOptions(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 rounded-xl transition-colors text-left">
+                           <FiCamera className="text-lg text-purple-400" /> Camera
+                         </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
       )}
 
